@@ -4,47 +4,81 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-export default function NuevoLibro() {
+export default function NuevoLibroCatalogo() {
   const router = useRouter();
 
-  // Estados del formulario
+  // Estados del Libro
   const [titulo, setTitulo] = useState("");
-  const [autor, setAutor] = useState("");
+  const [subtitulo, setSubtitulo] = useState("");
+  const [autorPrincipal, setAutorPrincipal] = useState("");
   const [isbn, setIsbn] = useState("");
   const [editorial, setEditorial] = useState("");
-  const [anioPublicacion, setAnioPublicacion] = useState(new Date().getFullYear());
-  const [materia, setMateria] = useState("");
-  const [ubicacionFisica, setUbicacionFisica] = useState("");
-  const [cantidadTotal, setCantidadTotal] = useState(1);
+  const [anioPublicacion, setAnioPublicacion] = useState("");
+  const [clasificacion, setClasificacion] = useState("");
+  const [codigoCutter, setCodigoCutter] = useState("");
 
+  // NUEVO: Estados para los Tags
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+
+  // Estados de los Ejemplares Físicos
+  const [ejemplares, setEjemplares] = useState([{ numeroInventario: "", observaciones: "" }]);
   const [cargando, setCargando] = useState(false);
 
+  // --- Funciones para Tags ---
+  const manejarInputTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Si aprieta Enter o la coma (,) agregamos el tag
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const nuevoTag = tagInput.trim();
+      if (nuevoTag && !tags.includes(nuevoTag)) {
+        setTags([...tags, nuevoTag]);
+      }
+      setTagInput("");
+    }
+  };
+
+  const removerTag = (tagAEliminar: string) => {
+    setTags(tags.filter(t => t !== tagAEliminar));
+  };
+
+  // --- Funciones para Ejemplares ---
+  const agregarEjemplar = () => setEjemplares([...ejemplares, { numeroInventario: "", observaciones: "" }]);
+  const removerEjemplar = (index: number) => setEjemplares(ejemplares.filter((_, i) => i !== index));
+  const actualizarEjemplar = (index: number, campo: string, valor: string) => {
+    const nuevos = [...ejemplares];
+    nuevos[index] = { ...nuevos[index], [campo]: valor };
+    setEjemplares(nuevos);
+  };
+
+  // --- Guardar en API ---
   const guardarLibro = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (ejemplares.some(ej => ej.numeroInventario.trim() === "")) {
+      alert("Completá el Número de Inventario de todos los ejemplares.");
+      return;
+    }
+
     setCargando(true);
 
     try {
       const res = await fetch("http://localhost:5078/api/libros", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          titulo,
-          autor,
-          isbn,
-          editorial,
-          anioPublicacion: Number(anioPublicacion),
-          materia,
-          ubicacionFisica,
-          cantidadTotal: Number(cantidadTotal),
-          cantidadDisponible: Number(cantidadTotal), // Arrancan todos disponibles
+          titulo, subtitulo, autorPrincipal, isbn, editorial, anioPublicacion, clasificacion, codigoCutter,
+          tags, // Mandamos el array de strings simple
+          ejemplares: ejemplares.map(ej => ({
+            numeroInventario: ej.numeroInventario,
+            observaciones: ej.observaciones
+          }))
         }),
       });
 
       if (res.ok) {
-        alert("¡Libro guardado en el catálogo con éxito!");
-        router.push("/"); // Volvemos al panel principal
+        alert("¡Catálogo e inventario actualizados!");
+        router.push("/"); 
       } else {
         const errorData = await res.json();
         alert("Error al guardar: " + (errorData.mensaje || "Revisá los datos."));
@@ -58,104 +92,129 @@ export default function NuevoLibro() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8 text-black">
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md border-t-4 border-purple-500">
-        <h1 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">Ingresar Nuevo Libro al Catálogo</h1>
+    <main className="min-h-screen bg-gray-50 p-8 text-black">
+      <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200 border-t-4 border-t-purple-600">
+        <h1 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">Ingresar Título al Catálogo</h1>
 
-        <form onSubmit={guardarLibro} className="space-y-5">
-          {/* Fila 1: Título y Autor (Los más importantes) */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Título del Libro *</label>
-              <input 
-                type="text" required
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                value={titulo} onChange={(e) => setTitulo(e.target.value)}
-              />
+        <form onSubmit={guardarLibro} className="space-y-8">
+          
+          {/* SECCIÓN 1: DATOS BIBLIOGRÁFICOS */}
+          <section>
+            <h2 className="text-lg font-semibold text-purple-800 mb-4 bg-purple-50 p-2 rounded">1. Ficha Bibliográfica</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Título *</label>
+                <input type="text" required className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subtítulo</label>
+                <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={subtitulo} onChange={(e) => setSubtitulo(e.target.value)} />
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Autor Principal *</label>
+                <input type="text" required className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Ej: Borges, Jorge Luis" value={autorPrincipal} onChange={(e) => setAutorPrincipal(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Editorial</label>
+                <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={editorial} onChange={(e) => setEditorial(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Año Pub.</label>
+                  <input type="text" placeholder="Ej: 2010" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={anioPublicacion} onChange={(e) => setAnioPublicacion(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ISBN</label>
+                  <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={isbn} onChange={(e) => setIsbn(e.target.value)} />
+                </div>
+              </div>
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Autor / Autores *</label>
-              <input 
-                type="text" required
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                value={autor} onChange={(e) => setAutor(e.target.value)}
-              />
-            </div>
-          </div>
+          </section>
 
-          {/* Fila 2: Datos editoriales */}
-          <div className="grid grid-cols-3 gap-4 bg-gray-50 p-4 rounded border">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ISBN</label>
+          {/* NUEVA SECCIÓN: ETIQUETAS (TAGS) */}
+          <section>
+            <h2 className="text-lg font-semibold text-purple-800 mb-4 bg-purple-50 p-2 rounded">2. Etiquetas y Materias</h2>
+            <div className="border border-gray-300 p-4 rounded-lg bg-gray-50">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Agregar Tags (Escribí el tema y apretá <kbd className="bg-gray-200 px-1 rounded">Enter</kbd> o coma)
+              </label>
+              
+              <div className="flex flex-wrap gap-2 mb-3">
+                {tags.map((tag, index) => (
+                  <span key={index} className="bg-purple-600 text-white text-sm font-medium px-3 py-1 rounded-full flex items-center gap-2 shadow-sm">
+                    {tag}
+                    <button type="button" onClick={() => removerTag(tag)} className="hover:text-red-300 font-bold">×</button>
+                  </span>
+                ))}
+              </div>
+
               <input 
                 type="text" 
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                value={isbn} onChange={(e) => setIsbn(e.target.value)}
-                placeholder="Ej: 978..."
+                placeholder="Ej: Historia Argentina, Novela, Ficción..." 
+                className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" 
+                value={tagInput} 
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={manejarInputTag}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Editorial</label>
-              <input 
-                type="text" 
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                value={editorial} onChange={(e) => setEditorial(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Año Pub.</label>
-              <input 
-                type="number" 
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                value={anioPublicacion} onChange={(e) => setAnioPublicacion(Number(e.target.value))}
-              />
-            </div>
-          </div>
+          </section>
 
-          {/* Fila 3: Clasificación Escolar e Inventario */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Materia</label>
-              <input 
-                type="text" 
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                value={materia} onChange={(e) => setMateria(e.target.value)}
-                placeholder="Ej: Historia"
-              />
+          {/* SECCIÓN SIGNATURA TOPOGRÁFICA */}
+          <section>
+            <h2 className="text-lg font-semibold text-purple-800 mb-4 bg-purple-50 p-2 rounded">3. Ubicación en Estante</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Clasificación (Ej: 863)</label>
+                <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none font-mono" value={clasificacion} onChange={(e) => setClasificacion(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cutter-Sanborn (Ej: B732)</label>
+                <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none font-mono" value={codigoCutter} onChange={(e) => setCodigoCutter(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
-              <input 
-                type="text" 
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                value={ubicacionFisica} onChange={(e) => setUbicacionFisica(e.target.value)}
-                placeholder="Ej: Estante 3"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Copias Totales *</label>
-              <input 
-                type="number" min="1" required
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                value={cantidadTotal} onChange={(e) => setCantidadTotal(Number(e.target.value))}
-              />
-            </div>
-          </div>
+          </section>
 
-          {/* Botones */}
-          <div className="flex justify-end gap-3 pt-6 border-t mt-6">
-            <Link 
-              href="/"
-              className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded transition"
-            >
-              Cancelar
-            </Link>
-            <button 
-              type="submit" 
-              disabled={cargando}
-              className={`px-6 py-2 rounded font-bold text-white transition ${cargando ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700 shadow'}`}
-            >
-              {cargando ? 'Guardando...' : 'Guardar Libro'}
+          {/* SECCIÓN EJEMPLARES FÍSICOS */}
+          <section>
+            <div className="flex justify-between items-center mb-4 bg-gray-100 p-2 rounded border border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-800">4. Ejemplares Físicos (Inventario)</h2>
+              <button type="button" onClick={agregarEjemplar} className="text-sm bg-purple-200 text-purple-800 hover:bg-purple-300 px-3 py-1 rounded font-bold transition">
+                + Agregar Copia
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {ejemplares.map((ej, index) => (
+                <div key={index} className="flex gap-3 items-start bg-white p-3 border border-gray-300 rounded-lg shadow-sm">
+                  <div className="w-1/3">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Nº Inventario *</label>
+                    <input 
+                      type="text" required placeholder="Ej: 00452"
+                      className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none font-mono font-bold text-purple-900 bg-purple-50"
+                      value={ej.numeroInventario} onChange={(e) => actualizarEjemplar(index, 'numeroInventario', e.target.value)} 
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Observaciones</label>
+                    <input 
+                      type="text" placeholder="Ej: Faltan hojas..."
+                      className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none"
+                      value={ej.observaciones} onChange={(e) => actualizarEjemplar(index, 'observaciones', e.target.value)} 
+                    />
+                  </div>
+                  {ejemplares.length > 1 && (
+                    <button type="button" onClick={() => removerEjemplar(index)} className="mt-6 text-red-500 hover:bg-red-50 px-3 py-2 rounded transition">✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* BOTONES */}
+          <div className="flex justify-end gap-3 pt-6 border-t mt-8">
+            <Link href="/" className="px-6 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded transition">Cancelar</Link>
+            <button type="submit" disabled={cargando} className={`px-8 py-3 rounded-xl font-bold text-white transition shadow-lg ${cargando ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'}`}>
+              {cargando ? 'Guardando...' : 'Guardar Ficha'}
             </button>
           </div>
         </form>

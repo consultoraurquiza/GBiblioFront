@@ -14,7 +14,7 @@ async function getDetallePrestamo(id: string) {
   return res.json();
 }
 
-export default async function DetallePrestamo({ params }: { params: { id: string } }) {
+export default async function DetallePrestamo({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   const prestamo = await getDetallePrestamo(resolvedParams.id);
 
@@ -62,7 +62,7 @@ export default async function DetallePrestamo({ params }: { params: { id: string
             
             {/* Si está activo, mostramos tu botón de devolver acá también */}
             {prestamo.estado === 0 && (
-              <BotonDevolver prestamoId={prestamo.id} tituloLibro={prestamo.libro?.titulo} />
+              <BotonDevolver prestamoId={prestamo.id} tituloLibro={prestamo.ejemplar?.libro?.titulo || "Libro"} />
             )}
           </div>
         </div>
@@ -107,13 +107,13 @@ export default async function DetallePrestamo({ params }: { params: { id: string
             <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Libro Retirado</h2>
             <div className="space-y-3">
               <p><span className="text-gray-500 text-sm block">Título</span>
-                <span className="font-semibold text-lg">{prestamo.libro.titulo}</span>
+                <span className="font-semibold text-lg">{prestamo.ejemplar?.libro?.titulo || "Sin título"}</span>
               </p>
-              <p><span className="text-gray-500 text-sm block">Autor</span> {prestamo.libro.autor}</p>
+              <p><span className="text-gray-500 text-sm block">Autor</span> {prestamo.ejemplar?.libro?.autorPrincipal || "Desconocido"}</p>
               
               <div className="grid grid-cols-2 gap-4 mt-2">
-                <p><span className="text-gray-500 text-sm block">ISBN</span> {prestamo.libro.isbn || "N/A"}</p>
-                <p><span className="text-gray-500 text-sm block">Ubicación</span> {prestamo.libro.ubicacionFisica || "N/A"}</p>
+                <p><span className="text-gray-500 text-sm block">ISBN</span> {prestamo.ejemplar?.libro?.isbn || "N/A"}</p>
+                <p><span className="text-gray-500 text-sm block">Inventario</span> Nº {prestamo.ejemplar?.numeroInventario || "N/A"}</p>
               </div>
             </div>
 
