@@ -18,6 +18,7 @@ export default async function DetalleLibro({ params }: { params: Promise<{ id: s
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <h1 className="text-2xl font-bold text-red-600 mb-4">Libro no encontrado</h1>
         <Link href="/" className="text-purple-600 underline">Volver al catálogo</Link>
+        
       </div>
     );
   }
@@ -28,9 +29,14 @@ export default async function DetalleLibro({ params }: { params: Promise<{ id: s
         
         {/* Encabezado y Ficha */}
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 mb-8">
-          <Link href="/" className="text-gray-500 hover:text-purple-600 transition font-medium mb-4 inline-block">
-            ← Volver al Catálogo
-          </Link>
+          <div className="flex justify-between items-center mb-4">
+            <Link href="/" className="text-gray-500 hover:text-purple-600 transition font-medium inline-block">
+              ← Volver al Catálogo
+            </Link>
+            <Link href={`/libros/editar/${libro.id}`} className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 px-4 py-2 rounded-lg text-sm font-bold border border-yellow-300 transition shadow-sm">
+              ✏️ Editar Catálogo e Inventario
+            </Link>
+          </div>
           
           <div className="flex justify-between items-start mt-2">
             <div>

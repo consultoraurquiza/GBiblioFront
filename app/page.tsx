@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function CatalogoOPAC() {
   const [libros, setLibros] = useState<any[]>([]);
@@ -54,7 +55,13 @@ export default function CatalogoOPAC() {
       <nav className="bg-slate-800 text-white p-4 shadow-md">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">📚</span>
+            <span className="text-2xl"><Image 
+  src="/logoF.png" 
+  alt="Logo EETP 464" 
+  width={40} 
+  height={40} 
+  className="object-contain"
+/></span>
             <h1 className="text-xl font-bold tracking-wider">BIBLIOTECA EETP 464</h1>
           </div>
           <div className="flex gap-3">
