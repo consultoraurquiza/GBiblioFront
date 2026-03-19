@@ -16,6 +16,7 @@ export default function NuevoLibroCatalogo() {
   const [anioPublicacion, setAnioPublicacion] = useState("");
   const [clasificacion, setClasificacion] = useState("");
   const [codigoCutter, setCodigoCutter] = useState("");
+  const [buscandoIsbn, setBuscandoIsbn] = useState(false);
 
   // NUEVO: Estados para los Tags
   const [tagInput, setTagInput] = useState("");
@@ -49,6 +50,80 @@ export default function NuevoLibroCatalogo() {
     const nuevos = [...ejemplares];
     nuevos[index] = { ...nuevos[index], [campo]: valor };
     setEjemplares(nuevos);
+  };
+
+  // Función para autocompletar el Cutter-Sanborn
+  const autocompletarCutter = async (autorIngresado: string) => {
+    if (!autorIngresado || autorIngresado.length < 2) return;
+    
+    try {
+      const res = await fetch(`http://localhost:5078/api/libros/cutter/${autorIngresado}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCodigoCutter(data.cutter); // Rellenamos el input mágicamente
+      }
+    } catch (error) {
+      console.error("No se pudo calcular el Cutter automáticamente.");
+    }
+  };
+
+  // Función para invertir "Nombre Apellido" a "Apellido, Nombre"
+  const invertirNombreComercial = (nombreComercial: string) => {
+    if (!nombreComercial) return "";
+    const partes = nombreComercial.trim().split(" ");
+    
+    // Si tiene una sola palabra (ej: "Homero"), lo devolvemos igual
+    if (partes.length <= 1) return nombreComercial; 
+    
+    // Sacamos la última palabra asumiendo que es el apellido
+    const apellido = partes.pop(); 
+    const nombres = partes.join(" "); // Juntamos todo lo demás
+    
+    return `${apellido}, ${nombres}`;
+  };
+
+  const buscarDatosPorIsbn = async () => {
+    if (!isbn || isbn.length < 10) {
+      alert("Por favor, ingresá un ISBN válido (10 o 13 dígitos) para buscar.");
+      return;
+    }
+    
+    setBuscandoIsbn(true);
+    // Limpiamos campos por las dudas
+    setTitulo(""); setSubtitulo(""); setAutorPrincipal(""); setEditorial(""); setAnioPublicacion("");
+
+    try {
+      const res = await fetch(`http://localhost:5078/api/libros/lookup/isbn/${isbn}`);
+      
+      if (res.ok) {
+        const data = await res.json();
+        // Rellenamos el formulario mágicamente
+        setTitulo(data.titulo);
+        setSubtitulo(data.subtitulo);
+        setEditorial(data.editorial);
+        setAnioPublicacion(data.anioPublicacion);
+        
+        // Magia híbrida: Invertimos el nombre antes de ponerlo en pantalla
+        const autorInvertido = invertirNombreComercial(data.autorPrincipal);
+        setAutorPrincipal(autorInvertido);
+        
+        // Ahora sí, disparamos el cálculo del Cutter con el formato "Apellido, Nombre"
+        if (autorInvertido) {
+          autocompletarCutter(autorInvertido);
+        }
+        
+        // ¡Opa! Si se rellenó el autor, intentamos calcular el Cutter automáticamente
+        //if(data.autorPrincipal) autocompletarCutter(data.autorPrincipal);
+
+      } else {
+        const err = await res.json();
+        alert(err.mensaje || "No se encontraron datos para este ISBN.");
+      }
+    } catch (error) {
+      alert("No se pudo conectar con el servicio de búsqueda.");
+    } finally {
+      setBuscandoIsbn(false);
+    }
   };
 
   // --- Guardar en API ---
@@ -112,7 +187,18 @@ export default function NuevoLibroCatalogo() {
               </div>
               <div className="col-span-2 md:col-span-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Autor Principal *</label>
-                <input type="text" required className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Ej: Borges, Jorge Luis" value={autorPrincipal} onChange={(e) => setAutorPrincipal(e.target.value)} />
+                <input 
+                  type="text" 
+                  required 
+                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" 
+                  placeholder="Ej: Borges, Jorge Luis" 
+                  value={autorPrincipal} 
+                  onChange={(e) => setAutorPrincipal(e.target.value)} 
+                  onBlur={() => autocompletarCutter(autorPrincipal)} 
+                />
+                <p className="text-xs text-amber-600 mt-1 font-medium bg-amber-50 inline-block px-2 py-0.5 rounded border border-amber-200">
+                  ⚠️ Ojo: Revisar autores con apellidos compuestos (ej: García Márquez).
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Editorial</label>
@@ -125,7 +211,22 @@ export default function NuevoLibroCatalogo() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">ISBN</label>
-                  <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={isbn} onChange={(e) => setIsbn(e.target.value)} />
+                  <input 
+                    type="text" 
+                    placeholder="978..."
+                    className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none mb-2" 
+                    value={isbn} 
+                    onChange={(e) => setIsbn(e.target.value)} 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={buscarDatosPorIsbn}
+                    disabled={buscandoIsbn}
+                    className={`w-full justify-center px-3 py-2 rounded-lg border transition flex items-center gap-2 text-sm font-bold ${buscandoIsbn ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200'}`}
+                    title="Buscar datos automáticamente en Google Books"
+                  >
+                    {buscandoIsbn ? '⏳ Buscando...' : '✨ Autocompletar desde Internet'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -169,7 +270,15 @@ export default function NuevoLibroCatalogo() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cutter-Sanborn (Ej: B732)</label>
-                <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none font-mono" value={codigoCutter} onChange={(e) => setCodigoCutter(e.target.value)} />
+                <input 
+                  type="text" 
+                  className="w-full border p-2 rounded font-mono focus:ring-2 focus:ring-purple-500" 
+                  value={codigoCutter} 
+                  onChange={(e) => setCodigoCutter(e.target.value)} 
+                />
+                <p className="text-xs text-amber-600 mt-1 font-medium bg-amber-50 inline-block px-2 py-0.5 rounded border border-amber-200 shadow-sm">
+                  ⚠️ Ojo: Revisar si el autor tenía apellido compuesto.
+                </p>
               </div>
             </div>
           </section>

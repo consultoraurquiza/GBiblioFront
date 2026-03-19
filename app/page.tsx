@@ -8,6 +8,7 @@ export default function CatalogoOPAC() {
   const [libros, setLibros] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
+  const [menuLectoresAbierto, setMenuLectoresAbierto] = useState(false);
 
   // Cargar todos los libros al entrar
   useEffect(() => {
@@ -65,12 +66,41 @@ export default function CatalogoOPAC() {
             <h1 className="text-xl font-bold tracking-wider">BIBLIOTECA EETP 464</h1>
           </div>
           <div className="flex gap-3">
+            <Link href="/herramientas/cutter" className="text-slate-300 hover:text-white px-3 py-2 rounded text-sm font-medium transition flex items-center gap-1.5">
+              📏 Ver Tabla Cutter
+            </Link>
             <Link href="/prestamos" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2">
               Mostrador / Devoluciones
             </Link>
-            <Link href="/usuarios/nuevo" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition">
-              Lectores
-            </Link>
+            {/* Menú Desplegable de Lectores (Por Clic) */}
+          <div className="relative">
+            <button 
+              onClick={() => setMenuLectoresAbierto(!menuLectoresAbierto)}
+              className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2"
+            >
+              👥 Lectores {menuLectoresAbierto ? '▴' : '▾'}
+            </button>
+            
+            {/* La caja que aparece SOLO si el estado es true */}
+            {menuLectoresAbierto && (
+              <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in-down">
+                <Link 
+                  href="/usuarios/nuevo" 
+                  onClick={() => setMenuLectoresAbierto(false)} 
+                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition border-b border-gray-50"
+                >
+                  ✨ Nuevo Lector
+                </Link>
+                <Link 
+                  href="/usuarios/buscar" 
+                  onClick={() => setMenuLectoresAbierto(false)} 
+                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition"
+                >
+                  🔍 Consultar / Editar
+                </Link>
+              </div>
+            )}
+          </div>
             <Link href="/libros/nuevo" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded text-sm font-bold transition shadow-lg">
               + Ingresar Libro
             </Link>
