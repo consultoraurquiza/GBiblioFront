@@ -69,11 +69,17 @@ export default function CatalogoOPAC() {
             <Link href="/herramientas/cutter" className="text-slate-300 hover:text-white px-3 py-2 rounded text-sm font-medium transition flex items-center gap-1.5">
               📏 Ver Tabla Cutter
             </Link>
+            <Link 
+            href="/inventario" 
+            className="bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 shadow-sm"
+          >
+            📚 Ver Inventario
+          </Link>
             <Link href="/prestamos" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2">
               Mostrador / Devoluciones
             </Link>
             {/* Menú Desplegable de Lectores (Por Clic) */}
-          <div className="relative">
+          <div className="relative hidden">
             <button 
               onClick={() => setMenuLectoresAbierto(!menuLectoresAbierto)}
               className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2"

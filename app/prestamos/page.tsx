@@ -1,17 +1,44 @@
+"use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import BotonDevolver from "@/components/BotonDevolver";
 
-async function getPrestamosActivos() {
-  const res = await fetch("http://localhost:5078/api/prestamos/activos", {
-    cache: "no-store",
-  });
+// async function getPrestamosActivos() {
+//   const res = await fetch("http://localhost:5078/api/prestamos/activos", {
+//     cache: "no-store",
+//   });
   
-  if (!res.ok) return [];
-  return res.json();
-}
+//   if (!res.ok) return [];
+//   return res.json();
+// }
 
-export default async function MostradorPrestamos() {
-  const prestamos = await getPrestamosActivos();
+export default function HistorialPrestamos() {
+  const [prestamos, setPrestamos] = useState([]);
+  const [filtro, setFiltro] = useState("activos");
+  const [cargando, setCargando] = useState(true);
+
+  // Cada vez que cambia el filtro en el Select, volvemos a llamar a C#
+  useEffect(() => {
+    const cargarPrestamos = async () => {
+      setCargando(true);
+      try {
+        const res = await fetch(`http://localhost:5078/api/prestamos?filtro=${filtro}`);
+        if (res.ok) {
+          const data = await res.json();
+          setPrestamos(data);
+        }
+      } catch (error) {
+        console.error("Error al cargar los préstamos", error);
+      } finally {
+        setCargando(false);
+      }
+    };
+
+    cargarPrestamos();
+  }, [filtro]);
+
+// export default async function MostradorPrestamos() {
+//   const prestamos = await getPrestamosActivos();
 
   return (
     <main className="min-h-screen bg-gray-50 text-black">
@@ -38,6 +65,18 @@ export default async function MostradorPrestamos() {
             Total en circulación: {prestamos.length}
           </div>
         </div>
+        <div className="flex gap-4 items-center w-full md:w-auto pb-4">
+            <label className="font-bold text-gray-700 text-sm uppercase tracking-wide">Filtro:</label>
+            <select 
+              className="bg-gray-50 border-2 border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block w-full md:w-64 p-2.5 font-medium outline-none cursor-pointer"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+            >
+              <option value="activos">🔵 Préstamos Activos (En calle)</option>
+              <option value="vencidos">🔴 Vencidos (Reclamar)</option>
+              <option value="finalizados">✅ Finalizados (Historial)</option>
+            </select>
+          </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -71,8 +110,10 @@ export default async function MostradorPrestamos() {
                     return (
                       <tr key={prestamo.id} className={`hover:bg-gray-50 transition ${estaVencido ? 'bg-red-50/30' : ''}`}>
                         <td className="px-6 py-4">
-                          <p className="font-bold text-gray-900">{prestamo.usuario?.nombre} {prestamo.usuario?.apellido}</p>
-                          <p className="text-xs text-gray-500">DNI: {prestamo.usuario?.dni}</p>
+                          {/* <p className="font-bold text-gray-900">{prestamo.usuario?.nombre} {prestamo.usuario?.apellido}</p> */}
+                          <p className="font-bold text-gray-900">{prestamo.nombreLector}</p>
+                          <p className="font-bold text-gray-900">{prestamo.cursoOAula}</p>
+                          {/* <p className="text-xs text-gray-500">DNI: {prestamo.usuario?.dni}</p> */}
                         </td>
                         <td className="px-6 py-4">
                           <p className="font-bold text-purple-900 line-clamp-1">{prestamo.ejemplar?.libro?.titulo}</p>
@@ -85,15 +126,25 @@ export default async function MostradorPrestamos() {
                           {fechaVencimiento.toLocaleDateString('es-AR')}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {estaVencido ? (
+                          {filtro === "finalizados" ? (
+                              <div>
+                                <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full border border-green-200">
+                                  DEVUELTO
+                                </span>
+                              </div>) : (
+                          estaVencido ? (
                             <span className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-full border border-red-200">
                               VENCIDO ({diasRetraso} días)
                             </span>
+                            
                           ) : (
                             <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full border border-green-200">
                               AL DÍA
                             </span>
-                          )}
+                            
+                          ))}
+                          
+                          
                         </td>
                         <td className="px-6 py-4 text-center flex justify-center gap-2">
                           <Link 
@@ -102,10 +153,11 @@ export default async function MostradorPrestamos() {
                           >
                             Ver Ficha
                           </Link>
+                          {filtro !== "finalizados" && (
                           <BotonDevolver 
                             prestamoId={prestamo.id} 
                             tituloLibro={prestamo.ejemplar?.libro?.titulo || "Libro"} 
-                          />
+                          />)}
                         </td>
                       </tr>
                     );

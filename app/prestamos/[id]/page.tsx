@@ -37,15 +37,26 @@ export default async function DetallePrestamo({ params }: { params: Promise<{ id
   const estaVencido = prestamo.estado === 0 && diasRetraso > 0;
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8 text-black">
+    <main className="min-h-screen bg-gray-100  text-black">
+      <nav className="bg-slate-800 text-white p-4 mb-4 shadow-md print:hidden">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">📋</span>
+            <h1 className="text-xl font-bold tracking-wider">DETALLE DEL PRÉSTAMO</h1>
+          </div>
+          <Link href={"/prestamos"} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition">
+            Volver a Prestamos
+          </Link>
+        </div>
+      </nav>
       <div className="max-w-4xl mx-auto">
         
         {/* Encabezado con estado */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-500 hover:text-gray-800 transition font-medium">
+            {/* <Link href="/" className="text-gray-500 hover:text-gray-800 transition font-medium">
               ← Volver
-            </Link>
+            </Link> */}
             <h1 className="text-3xl font-bold text-gray-800">Detalle del Préstamo #{prestamo.id}</h1>
           </div>
           
@@ -74,6 +85,12 @@ export default async function DetallePrestamo({ params }: { params: Promise<{ id
             <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Datos del Lector</h2>
             <div className="space-y-3">
               <p><span className="text-gray-500 text-sm block">Nombre Completo</span>
+                <span className="font-semibold text-lg">{prestamo.nombreLector}</span>
+              </p>
+              <p><span className="text-gray-500 text-sm block">Curso o Aula</span>
+                <span className="font-semibold text-lg">{prestamo.cursoOAula}</span>
+              </p>
+              {/* <p><span className="text-gray-500 text-sm block">Nombre Completo</span>
                 <span className="font-semibold text-lg">{prestamo.usuario.nombre} {prestamo.usuario.apellido}</span>
               </p>
               <div className="grid grid-cols-2 gap-4">
@@ -83,10 +100,10 @@ export default async function DetallePrestamo({ params }: { params: Promise<{ id
               
               {prestamo.usuario.rol === 0 && (
                 <p><span className="text-gray-500 text-sm block">Curso</span> {prestamo.usuario.anio} "{prestamo.usuario.division}"</p>
-              )}
+              )} */}
 
               {/* El teléfono gigante para llamar */}
-              <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-100 flex items-center justify-between">
+              {/* <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-100 flex items-center justify-between">
                 <div>
                   <span className="text-green-800 text-sm font-bold block mb-1">Contacto telefónico</span>
                   <span className="font-mono text-lg font-medium text-gray-800">
@@ -98,7 +115,7 @@ export default async function DetallePrestamo({ params }: { params: Promise<{ id
                     Llamar
                   </a>
                 )}
-              </div>
+              </div> */}
             </div>
           </div>
 

@@ -120,7 +120,18 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
   if (cargandoDatos) return <div className="p-8 text-center text-black">Cargando catálogo...</div>;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black">
+    <main className="min-h-screen bg-gray-50  text-black">
+      <nav className="bg-slate-800 text-white p-4 mb-4 shadow-md print:hidden">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">📋</span>
+            <h1 className="text-xl font-bold tracking-wider">EDICION</h1>
+          </div>
+          <Link href={`/libros/${id}`} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition">
+            Volver al Libro
+          </Link>
+        </div>
+      </nav>
       <div className="max-w-5xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200 border-t-4 border-t-purple-600">
         <div className="flex justify-between items-center mb-6 border-b pb-4">
           <h1 className="text-2xl font-bold text-gray-800">Editar Catálogo e Inventario</h1>

@@ -14,31 +14,23 @@ export default function BotonPrestarEjemplar({ ejemplarId, numeroInventario, tit
   
   // Estados para controlar la ventana flotante (Modal)
   const [abierto, setAbierto] = useState(false);
-  const [dni, setDni] = useState("");
-  const [usuario, setUsuario] = useState<any>(null);
+  
+  // NUEVOS ESTADOS: Datos manuales del préstamo
+  const [nombreLector, setNombreLector] = useState("");
+  const [cursoOAula, setCursoOAula] = useState("");
+  
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
 
-  const buscarLector = async () => {
-    setError("");
-    setUsuario(null);
-    if (!dni) return;
-
-    try {
-      const res = await fetch(`http://localhost:5078/api/usuarios/buscar/${dni}`);
-      if (res.ok) {
-        setUsuario(await res.json());
-      } else {
-        setError("Lector no encontrado. Verificá el DNI.");
-      }
-    } catch (err) {
-      setError("Error de conexión.");
-    }
-  };
-
   const confirmarPrestamo = async () => {
-    if (!usuario) return;
+    // Validación básica: al menos necesitamos saber quién se lo lleva
+    if (!nombreLector.trim()) {
+      setError("El nombre es obligatorio.");
+      return;
+    }
+
     setCargando(true);
+    setError("");
 
     try {
       const res = await fetch("http://localhost:5078/api/prestamos/prestar", {
@@ -46,22 +38,25 @@ export default function BotonPrestarEjemplar({ ejemplarId, numeroInventario, tit
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ejemplarId: ejemplarId,
-          usuarioId: usuario.id
+          nombreLector: nombreLector,
+          cursoOAula: cursoOAula
         })
       });
 
       if (res.ok) {
         alert("¡Préstamo registrado con éxito!");
-        setAbierto(false); // Cerramos el modal
-        setDni("");
-        setUsuario(null);
-        router.refresh(); // Magia de Next.js: recarga la tabla de fondo para actualizar el stock
+        // Limpiamos todo
+        setAbierto(false); 
+        setNombreLector("");
+        setCursoOAula("");
+        // Magia de Next.js: recarga la tabla de fondo para actualizar el stock
+        router.refresh(); 
       } else {
         const data = await res.json();
-        alert("Error: " + data.mensaje);
+        setError("Error: " + data.mensaje);
       }
     } catch (error) {
-      alert("Error de conexión al intentar guardar.");
+      setError("Error de conexión al intentar guardar.");
     } finally {
       setCargando(false);
     }
@@ -82,46 +77,66 @@ export default function BotonPrestarEjemplar({ ejemplarId, numeroInventario, tit
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full text-left border-t-4 border-purple-600">
             <h3 className="text-xl font-bold mb-1 text-gray-800">Salida de Material</h3>
-            <p className="text-sm text-gray-500 mb-5">
+            <p className="text-sm text-gray-500 mb-5 pb-4 border-b border-gray-100">
               Ejemplar <strong>Nº {numeroInventario}</strong> • {tituloLibro}
             </p>
 
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-gray-700 mb-1">DNI del Lector</label>
-              <div className="flex gap-2">
+            {/* FORMULARIO MANUAL RÁPIDO */}
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  ¿Quién se lo lleva? *
+                </label>
                 <input 
                   type="text" 
-                  className="border border-gray-300 p-2 rounded flex-1 focus:ring-2 focus:ring-purple-500 outline-none"
-                  value={dni}
-                  onChange={(e) => setDni(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && buscarLector()}
-                  placeholder="Ej: 45123456"
+                  className="w-full border-2 border-gray-300 p-2.5 rounded-lg focus:border-purple-500 focus:ring-0 outline-none font-medium"
+                  value={nombreLector}
+                  onChange={(e) => {
+                    setNombreLector(e.target.value);
+                    if(error) setError(""); // Limpiamos el error si empieza a escribir
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && nombreLector && confirmarPrestamo()}
+                  placeholder="Ej: Mateo / Prof. Gómez"
                   autoFocus
                 />
-                <button onClick={buscarLector} className="bg-gray-100 hover:bg-gray-200 border border-gray-300 px-4 py-2 rounded font-medium text-gray-700 transition">
-                  Buscar
-                </button>
               </div>
-              {error && <p className="text-red-500 text-sm mt-2 font-medium">{error}</p>}
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  Curso / Aula (Opcional)
+                </label>
+                <input 
+                  type="text" 
+                  className="w-full border-2 border-gray-300 p-2.5 rounded-lg focus:border-purple-500 focus:ring-0 outline-none font-medium text-gray-600"
+                  value={cursoOAula}
+                  onChange={(e) => setCursoOAula(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && nombreLector && confirmarPrestamo()}
+                  placeholder="Ej: 5to B / Sala de Maestros"
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 text-red-600 p-3 rounded text-sm font-bold mt-2">
+                  ⚠️ {error}
+                </div>
+              )}
             </div>
 
-            {/* Si el lector existe, mostramos sus datos en verde */}
-            {usuario && (
-              <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-5">
-                <p className="text-xs text-green-700 font-bold uppercase tracking-wider mb-1">✓ Lector Habilitado</p>
-                <p className="text-lg font-bold text-green-900">{usuario.nombre} {usuario.apellido}</p>
-                {usuario.rol === 0 && <p className="text-sm text-green-800 font-medium">Curso: {usuario.anio} "{usuario.division}"</p>}
-              </div>
-            )}
-
+            {/* BOTONERA */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-              <button onClick={() => setAbierto(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 font-medium rounded transition">
+              <button 
+                onClick={() => {
+                  setAbierto(false);
+                  setError(""); // Limpiamos errores si cancela
+                }} 
+                className="px-4 py-2 text-gray-500 hover:bg-gray-100 font-medium rounded transition"
+              >
                 Cancelar
               </button>
               <button 
                 onClick={confirmarPrestamo}
-                disabled={!usuario || cargando}
-                className={`px-5 py-2 rounded font-bold text-white transition ${(!usuario || cargando) ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 shadow-md'}`}
+                disabled={cargando || !nombreLector.trim()}
+                className={`px-5 py-2 rounded font-bold text-white transition ${(!nombreLector.trim() || cargando) ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 shadow-md'}`}
               >
                 {cargando ? 'Procesando...' : 'Confirmar Préstamo'}
               </button>

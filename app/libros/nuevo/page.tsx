@@ -167,7 +167,18 @@ export default function NuevoLibroCatalogo() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black">
+    <main className="min-h-screen bg-gray-50  text-black">
+      <nav className="bg-slate-800 text-white p-4 mb-4 shadow-md print:hidden">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">📋</span>
+            <h1 className="text-xl font-bold tracking-wider">INGRESAR LIBRO</h1>
+          </div>
+          <Link href="/" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition">
+            Volver al Catálogo
+          </Link>
+        </div>
+      </nav>
       <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200 border-t-4 border-t-purple-600">
         <h1 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">Ingresar Título al Catálogo</h1>
 
@@ -321,7 +332,7 @@ export default function NuevoLibroCatalogo() {
 
           {/* BOTONES */}
           <div className="flex justify-end gap-3 pt-6 border-t mt-8">
-            <Link href="/" className="px-6 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded transition">Cancelar</Link>
+            {/* <Link href="/" className="px-6 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded transition">Cancelar</Link> */}
             <button type="submit" disabled={cargando} className={`px-8 py-3 rounded-xl font-bold text-white transition shadow-lg ${cargando ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'}`}>
               {cargando ? 'Guardando...' : 'Guardar Ficha'}
             </button>

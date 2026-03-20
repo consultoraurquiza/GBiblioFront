@@ -24,7 +24,18 @@ export default async function DetalleLibro({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black">
+    <main className="min-h-screen bg-gray-50  text-black">
+      <nav className="bg-slate-800 text-white p-4 mb-4 shadow-md print:hidden">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">📋</span>
+            <h1 className="text-xl font-bold tracking-wider">DETALLE DEL LIBRO</h1>
+          </div>
+          <Link href="/" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition">
+            Volver al Catálogo
+          </Link>
+        </div>
+      </nav>
       <div className="max-w-5xl mx-auto">
         
         {/* Encabezado y Ficha */}
