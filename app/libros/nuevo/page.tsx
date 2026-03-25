@@ -17,10 +17,17 @@ export default function NuevoLibroCatalogo() {
   const [clasificacion, setClasificacion] = useState("");
   const [codigoCutter, setCodigoCutter] = useState("");
   const [buscandoIsbn, setBuscandoIsbn] = useState(false);
+  const [reseniaSinopsis, setReseniaSinopsis] = useState("");
+  const [cantidadPaginas, setCantidadPaginas] = useState("");
+  const [portadaUrl, setPortadaUrl] = useState("");
+  const [portadaPreview, setPortadaPreview] = useState<string | null>(null);
+  const [usarPortadaLocal, setUsarPortadaLocal] = useState(false); // El 'bool check'
+  const [archivoPortada, setArchivoPortada] = useState<File | null>(null); // El archivo subido
 
   // NUEVO: Estados para los Tags
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  //const [tagsSeleccionados, setTagsSeleccionados] = useState<string[]>([]);
 
   // Estados de los Ejemplares Físicos
   const [ejemplares, setEjemplares] = useState([{ numeroInventario: "", observaciones: "" }]);
@@ -41,6 +48,41 @@ export default function NuevoLibroCatalogo() {
 
   const removerTag = (tagAEliminar: string) => {
     setTags(tags.filter(t => t !== tagAEliminar));
+  };
+
+  // 2. FUNCIÓN DE TRADUCCIÓN AUTOMÁTICA DE TAGS
+  const obtenerTagsAutomaticos = (categoriesFromGoogle: string[]): string[] => {
+    if (!categoriesFromGoogle || categoriesFromGoogle.length === 0) return [];
+
+    const nuevosTags = new Set<string>(); // Usamos Set para evitar duplicados
+
+    categoriesFromGoogle.forEach(categoryEnIngles => {
+      // Buscamos si tenemos la categoría exacta en nuestro diccionario
+      const tagsTraducidos = traductorCategorias[categoryEnIngles];
+      
+      if (tagsTraducidos) {
+        tagsTraducidos.forEach(tag => nuevosTags.add(tag));
+      } else {
+        // 2. Fallbacks más amplios (pasamos a minúscula para no errar)
+        const catBaja = categoryEnIngles.toLowerCase();
+        let fueTraducido = false;
+
+        if (catBaja.includes("fiction")) { nuevosTags.add("Literatura"); fueTraducido = true; }
+        if (catBaja.includes("history")) { nuevosTags.add("Historia"); fueTraducido = true; }
+        if (catBaja.includes("science")) { nuevosTags.add("Ciencia"); fueTraducido = true; }
+        if (catBaja.includes("juvenile") || catBaja.includes("children")) { nuevosTags.add("Infantil/Juvenil"); fueTraducido = true; }
+        if (catBaja.includes("mystery") || catBaja.includes("detective")) { nuevosTags.add("Misterio/Policial"); fueTraducido = true; }
+        if (catBaja.includes("fantasy")) { nuevosTags.add("Fantasía"); fueTraducido = true; }
+        if (catBaja.includes("philosophy")) { nuevosTags.add("Filosofía"); fueTraducido = true; }
+        
+        // 3. LA RED DE SEGURIDAD: Si no encajó en nada, lo agregamos en inglés
+        if (!fueTraducido) {
+          nuevosTags.add(categoryEnIngles); 
+        }
+      }
+    });
+
+    return Array.from(nuevosTags); // Convertimos el Set de vuelta a Array
   };
 
   // --- Funciones para Ejemplares ---
@@ -97,11 +139,27 @@ export default function NuevoLibroCatalogo() {
       
       if (res.ok) {
         const data = await res.json();
-        // Rellenamos el formulario mágicamente
+        
+        // Rellenamos el formulario con los datos limpios que armó C#
         setTitulo(data.titulo);
         setSubtitulo(data.subtitulo);
         setEditorial(data.editorial);
         setAnioPublicacion(data.anioPublicacion);
+
+        // Sinopsis y Páginas directas del DTO
+        setReseniaSinopsis(data.reseniaSinopsis?.replace(/<[^>]+>/g, '') || "");
+        setCantidadPaginas(data.cantidadPaginas ? data.cantidadPaginas.toString() : "");
+
+        // Portada
+        const urlImagen = data.portadaUrl || "";
+        const urlSegura = urlImagen.replace("http://", "https://");
+        setPortadaUrl(urlSegura);
+        setPortadaPreview(urlSegura);
+
+        // Tags Automáticos usando el array que nos mandó C#
+        const categoriasGoogle = data.categorias || [];
+        const tagsSugeridos = obtenerTagsAutomaticos(categoriasGoogle);
+        setTags(prev => Array.from(new Set([...prev, ...tagsSugeridos])));
         
         // Magia híbrida: Invertimos el nombre antes de ponerlo en pantalla
         const autorInvertido = invertirNombreComercial(data.autorPrincipal);
@@ -126,6 +184,47 @@ export default function NuevoLibroCatalogo() {
     }
   };
 
+  const traductorCategorias: { [key: string]: string[] } = {
+  // Literatura General
+  "Fiction": ["Literatura", "Novela"],
+  "Fiction / General": ["Literatura"],
+  "Fiction / Literary": ["Literatura", "Clásico"],
+  
+  // Géneros Específicos
+  "Detective and mystery stories": ["Novela Negra", "Suspenso"],
+  "Fiction / Mystery & Detective / General": ["Novela Negra", "Suspenso"],
+  "Fiction / Fantasy / General": ["Fantasía"],
+  "Fiction / Science Fiction / General": ["Ciencia Ficción"],
+  "Fiction / Historical / General": ["Novela Histórica"],
+  "Fiction / Romance / General": ["Romance"],
+  "Poetry / General": ["Poesía"],
+  "Drama / General": ["Teatro"],
+  "Comics & Graphic Novels / General": ["Cómic", "Novela Gráfica"],
+
+  // Juvenil e Infantil
+  "Juvenile Fiction": ["Infantil", "Juvenil"],
+  "Children's stories": ["Infantil"],
+  
+  // No Ficción / Escolar
+  "History / General": ["Historia"],
+  "Biography & Autobiography / General": ["Biografía"],
+  "Science / General": ["Ciencias Naturales"],
+  "Philosophy / General": ["Filosofía"],
+  "Psychology / General": ["Psicología"],
+  "Social Science / General": ["Ciencias Sociales"],
+  "Language Arts & Disciplines / General": ["Lengua y Literatura"],
+  "Mathematics / General": ["Matemática"],
+  "Computers / General": ["Tecnología", "Informática"],
+  "Education / General": ["Pedagogía"],
+  "Textbooks": ["Manual Escolar"],
+  "Dictionaries": ["Diccionario", "Referencia"],
+  
+  // Arte y otros
+  "Art / General": ["Arte", "Música"],
+  "Sports & Recreation / General": ["Educación Física"],
+  "Cooking / General": ["Cocina"],
+};
+
   // --- Guardar en API ---
   const guardarLibro = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,17 +237,47 @@ export default function NuevoLibroCatalogo() {
     setCargando(true);
 
     try {
+      // 1. Creamos el empaquetador de formulario
+      const formData = new FormData();
+
+      // 2. Agregamos los textos simples
+      formData.append("titulo", titulo);
+      formData.append("subtitulo", subtitulo);
+      formData.append("autorPrincipal", autorPrincipal);
+      formData.append("isbn", isbn);
+      formData.append("editorial", editorial);
+      formData.append("anioPublicacion", anioPublicacion);
+      formData.append("clasificacion", clasificacion);
+      formData.append("codigoCutter", codigoCutter);
+      formData.append("reseniaSinopsis", reseniaSinopsis);
+      formData.append("portadaUrl", portadaUrl);
+
+      if (cantidadPaginas) {
+        formData.append("cantidadPaginas", cantidadPaginas.toString());
+      }
+
+      // 3. Agregamos la lógica de la imagen local (Asegurate de haber creado estos useState)
+      formData.append("usarPortadaLocal", usarPortadaLocal.toString());
+      if (archivoPortada) {
+        formData.append("archivoPortada", archivoPortada); // Acá viaja el archivo físico
+      }
+
+      // 4. Empaquetamos los Tags (A C# le gustan así: Tags[0], Tags[1]...)
+      tags.forEach((tag, index) => {
+        formData.append(`Tags[${index}]`, tag);
+      });
+
+      // 5. Empaquetamos los Ejemplares (A C# le gustan así: Ejemplares[0].NumeroInventario...)
+      ejemplares.forEach((ej, index) => {
+        formData.append(`Ejemplares[${index}].NumeroInventario`, ej.numeroInventario);
+        formData.append(`Ejemplares[${index}].Observaciones`, ej.observaciones);
+      });
+
+      // 6. Hacemos el envío
       const res = await fetch("http://localhost:5078/api/libros", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          titulo, subtitulo, autorPrincipal, isbn, editorial, anioPublicacion, clasificacion, codigoCutter,
-          tags, // Mandamos el array de strings simple
-          ejemplares: ejemplares.map(ej => ({
-            numeroInventario: ej.numeroInventario,
-            observaciones: ej.observaciones
-          }))
-        }),
+        // ¡IMPORTANTE! Al usar FormData NO se pone el header "Content-Type".
+        body: formData,
       });
 
       if (res.ok) {
@@ -211,6 +340,19 @@ export default function NuevoLibroCatalogo() {
                   ⚠️ Ojo: Revisar autores con apellidos compuestos (ej: García Márquez).
                 </p>
               </div>
+           
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reseña / Sinopsis</label>
+              <textarea 
+                rows={5}
+                placeholder="Escriba o pegue la sinopsis del libro..."
+                className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none text-sm leading-relaxed" 
+                value={reseniaSinopsis} 
+                onChange={(e) => setReseniaSinopsis(e.target.value)} 
+              />
+            </div>
+          </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Editorial</label>
                 <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={editorial} onChange={(e) => setEditorial(e.target.value)} />
@@ -240,6 +382,82 @@ export default function NuevoLibroCatalogo() {
                   </button>
                 </div>
               </div>
+            
+          </section>
+
+          <section>
+               {/* 5. DISEÑO DE UI: MOSTRAR LA PORTADA Y LOS NUEVOS DATOS */}
+        <div className="grid grid-cols-4 gap-6 mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl shadow-inner">
+          
+          {/* COLUMNA 1: PREVIEW DE LA TAPA */}
+          <div className="col-span-1 flex flex-col items-center">
+            <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Portada</h4>
+            <div className="w-full h-56 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden shadow-sm">
+              {portadaPreview ? (
+                <img src={portadaPreview} alt="Tapa del libro" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-5xl text-gray-300">🖼️</span>
+              )}
+            </div>
+          </div>
+
+          {/* COLUMNA 2, 3 y 4: DATOS EXPANSIBLES */}
+          <div className="col-span-3 space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              <div className="col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nº Páginas</label>
+                <input 
+                  type="number" 
+                  placeholder="Ej: 350"
+                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none font-medium" 
+                  value={cantidadPaginas} 
+                  onChange={(e) => setCantidadPaginas(e.target.value)} 
+                />
+              </div>
+              <div className="col-span-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">URL de Portada</label>
+                <input 
+                  type="text" 
+                  placeholder="Se completa automáticamente"
+                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none text-xs font-mono text-gray-600 bg-gray-50" 
+                  value={portadaUrl} 
+                  onChange={(e) => {
+                    setPortadaUrl(e.target.value);
+                    setPortadaPreview(e.target.value);
+                  }} 
+                />
+                {/* Opciones Locales (NUEVO) */}
+    <div className="border border-purple-200 p-4 rounded-lg bg-purple-50">
+      <h4 className="text-sm font-bold text-purple-900 mb-2">💾 Opciones Locales (Autonomía)</h4>
+      <div className="flex items-center gap-6">
+        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+          <input 
+            type="checkbox" 
+            checked={usarPortadaLocal} 
+            onChange={(e) => setUsarPortadaLocal(e.target.checked)} 
+          />
+          Usar Portada Local (A prueba de cortes de internet)
+        </label>
+        
+        <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Subir imagen a mano</label>
+          <input 
+            type="file" 
+            accept="image/*"
+            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200"
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                setArchivoPortada(e.target.files[0]);
+                setUsarPortadaLocal(true); // Si sube archivo, marcamos usar local automáticamente
+              }
+            }}
+          />
+        </div>
+      </div>
+    </div>
+              </div>
+            </div>
+            </div>
             </div>
           </section>
 
