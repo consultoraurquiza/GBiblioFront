@@ -18,7 +18,10 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
   const [anioPublicacion, setAnioPublicacion] = useState("");
   const [clasificacion, setClasificacion] = useState("");
   const [codigoCutter, setCodigoCutter] = useState("");
-  
+
+  const [buscandoIsbn, setBuscandoIsbn] = useState(false);
+  const [proveedorDatos, setProveedorDatos] = useState("todas");
+
   // NUEVOS ESTADOS EXPANSIBLES
   const [reseniaSinopsis, setReseniaSinopsis] = useState("");
   const [cantidadPaginas, setCantidadPaginas] = useState("");
@@ -26,6 +29,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
   const [portadaPreview, setPortadaPreview] = useState<string | null>(null);
   const [usarPortadaLocal, setUsarPortadaLocal] = useState(false);
   const [archivoPortada, setArchivoPortada] = useState<File | null>(null);
+  
   // Estados para los Tags
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -37,6 +41,58 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
+  // --- ESTADOS Y FUNCIONES PARA AUTOCOMPLETADO ---
+  const [sugerenciasAutor, setSugerenciasAutor] = useState<string[]>([]);
+  const [mostrarSugerenciasAutor, setMostrarSugerenciasAutor] = useState(false);
+
+  const [sugerenciasTags, setSugerenciasTags] = useState<string[]>([]);
+  const [mostrarSugerenciasTags, setMostrarSugerenciasTags] = useState(false);
+
+  const manejarCambioAutor = async (texto: string) => {
+    setAutorPrincipal(texto);
+    if (texto.length >= 2) {
+      try {
+        const res = await fetch(`http://localhost:5078/api/libros/autores/buscar?q=${texto}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSugerenciasAutor(data);
+          setMostrarSugerenciasAutor(true);
+        }
+      } catch (e) { console.error(e); }
+    } else {
+      setMostrarSugerenciasAutor(false);
+    }
+  };
+
+  const seleccionarAutor = (autor: string) => {
+    setAutorPrincipal(autor);
+    setMostrarSugerenciasAutor(false);
+  };
+
+  const manejarCambioTag = async (texto: string) => {
+    setTagInput(texto);
+    if (texto.length >= 2) {
+      try {
+        const res = await fetch(`http://localhost:5078/api/libros/tags/buscar?q=${texto}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSugerenciasTags(data);
+          setMostrarSugerenciasTags(true);
+        }
+      } catch (e) { console.error(e); }
+    } else {
+      setMostrarSugerenciasTags(false);
+    }
+  };
+
+  const seleccionarTag = (tag: string) => {
+    if (!tags.includes(tag)) {
+      setTags([...tags, tag]);
+    }
+    setTagInput("");
+    setMostrarSugerenciasTags(false);
+  };
+
   // --- 1. Cargar datos iniciales desde el Backend ---
   useEffect(() => {
     const cargarLibro = async () => {
@@ -44,7 +100,6 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
         const res = await fetch(`http://localhost:5078/api/libros/${id}`);
         if (res.ok) {
           const data = await res.json();
-          // Llenamos estados básicos
           setTitulo(data.titulo);
           setSubtitulo(data.subtitulo || "");
           setAutorPrincipal(data.autorPrincipal);
@@ -54,24 +109,20 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
           setClasificacion(data.clasificacion || "");
           setCodigoCutter(data.codigoCutter || "");
           
-          // LLENAMOS NUEVOS CAMPOS EXPANSIBLES
           setReseniaSinopsis(data.reseniaSinopsis || "");
           setCantidadPaginas(data.cantidadPaginas ? data.cantidadPaginas.toString() : "");
           setPortadaUrl(data.portadaUrl || "");
-          setPortadaPreview(data.portadaUrl || null); // Mostramos preview si hay foto
+          setPortadaPreview(data.portadaUrl || null); 
 
-          // LÓGICA DE PREVIEW INICIAL (ZONA LOCAL vs ZONA GOOGLE)
           setUsarPortadaLocal(data.usarPortadaLocal || false);
           if (data.usarPortadaLocal && data.portadaLocalUrl) {
-              setPortadaPreview(data.portadaLocalUrl); // Mostramos la local guardada
+              setPortadaPreview(data.portadaLocalUrl); 
           } else {
-              setPortadaPreview(data.portadaUrl || null); // Mostramos la de Google
+              setPortadaPreview(data.portadaUrl || null); 
           }
           
-          // Mapeamos Tags (vienen como objetos, necesitamos strings)
           setTags(data.tags?.map((t: any) => t.nombre) || []);
           
-          // Mapeamos Ejemplares
           setEjemplares(data.ejemplares?.map((e: any) => ({
             id: e.id,
             numeroInventario: e.numeroInventario,
@@ -92,7 +143,139 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
     cargarLibro();
   }, [id, router]);
 
-  // --- Funciones para Tags (Se mantienen) ---
+  const traductorCategorias: { [key: string]: string[] } = {
+  "Fiction": ["Literatura", "Novela"],
+  "Fiction / General": ["Literatura"],
+  "Fiction / Literary": ["Literatura", "Clásico"],
+  "Detective and mystery stories": ["Novela Negra", "Suspenso"],
+  "Fiction / Mystery & Detective / General": ["Novela Negra", "Suspenso"],
+  "Fiction / Fantasy / General": ["Fantasía"],
+  "Fiction / Science Fiction / General": ["Ciencia Ficción"],
+  "Fiction / Historical / General": ["Novela Histórica"],
+  "Fiction / Romance / General": ["Romance"],
+  "Poetry / General": ["Poesía"],
+  "Drama / General": ["Teatro"],
+  "Comics & Graphic Novels / General": ["Cómic", "Novela Gráfica"],
+  "Juvenile Fiction": ["Infantil", "Juvenil"],
+  "Children's stories": ["Infantil"],
+  "History / General": ["Historia"],
+  "Biography & Autobiography / General": ["Biografía"],
+  "Science / General": ["Ciencias Naturales"],
+  "Philosophy / General": ["Filosofía"],
+  "Psychology / General": ["Psicología"],
+  "Social Science / General": ["Ciencias Sociales"],
+  "Language Arts & Disciplines / General": ["Lengua y Literatura"],
+  "Mathematics / General": ["Matemática"],
+  "Computers / General": ["Tecnología", "Informática"],
+  "Education / General": ["Pedagogía"],
+  "Textbooks": ["Manual Escolar"],
+  "Dictionaries": ["Diccionario", "Referencia"],
+  "Art / General": ["Arte", "Música"],
+  "Sports & Recreation / General": ["Educación Física"],
+  "Cooking / General": ["Cocina"],
+  };
+
+  const obtenerTagsAutomaticos = (categoriesFromGoogle: string[]): string[] => {
+    if (!categoriesFromGoogle || categoriesFromGoogle.length === 0) return [];
+    const nuevosTags = new Set<string>(); 
+
+    categoriesFromGoogle.forEach(categoryEnIngles => {
+      const tagsTraducidos = traductorCategorias[categoryEnIngles];
+      if (tagsTraducidos) {
+        tagsTraducidos.forEach(tag => nuevosTags.add(tag));
+      } else {
+        const catBaja = categoryEnIngles.toLowerCase();
+        let fueTraducido = false;
+
+        if (catBaja.includes("fiction")) { nuevosTags.add("Literatura"); fueTraducido = true; }
+        if (catBaja.includes("history")) { nuevosTags.add("Historia"); fueTraducido = true; }
+        if (catBaja.includes("science")) { nuevosTags.add("Ciencia"); fueTraducido = true; }
+        if (catBaja.includes("juvenile") || catBaja.includes("children")) { nuevosTags.add("Infantil/Juvenil"); fueTraducido = true; }
+        if (catBaja.includes("mystery") || catBaja.includes("detective")) { nuevosTags.add("Misterio/Policial"); fueTraducido = true; }
+        if (catBaja.includes("fantasy")) { nuevosTags.add("Fantasía"); fueTraducido = true; }
+        if (catBaja.includes("philosophy")) { nuevosTags.add("Filosofía"); fueTraducido = true; }
+        
+        if (!fueTraducido) {
+          nuevosTags.add(categoryEnIngles); 
+        }
+      }
+    });
+
+    return Array.from(nuevosTags); 
+  };
+
+  const autocompletarCutter = async (autorIngresado: string) => {
+    if (!autorIngresado || autorIngresado.length < 2) return;
+    try {
+      const res = await fetch(`http://localhost:5078/api/libros/cutter/${autorIngresado}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCodigoCutter(data.cutter); 
+      }
+    } catch (error) {
+      console.error("No se pudo calcular el Cutter automáticamente.");
+    }
+  };
+
+  const invertirNombreComercial = (nombreComercial: string) => {
+    if (!nombreComercial) return "";
+    const partes = nombreComercial.trim().split(" ");
+    if (partes.length <= 1) return nombreComercial; 
+    const apellido = partes.pop(); 
+    const nombres = partes.join(" "); 
+    return `${apellido}, ${nombres}`;
+  };
+
+  const buscarDatosPorIsbn = async () => {
+    if (!isbn || isbn.length < 10) {
+      alert("Por favor, ingresá un ISBN válido (10 o 13 dígitos) para buscar.");
+      return;
+    }
+    
+    setBuscandoIsbn(true);
+    setTitulo(""); setSubtitulo(""); setAutorPrincipal(""); setEditorial(""); setAnioPublicacion("");
+
+    try {
+      const res = await fetch(`http://localhost:5078/api/libros/lookup/isbn/${isbn}?proveedor=${proveedorDatos}`);
+      
+      if (res.ok) {
+        const data = await res.json();
+        
+        setTitulo(data.titulo);
+        setSubtitulo(data.subtitulo);
+        setEditorial(data.editorial);
+        setAnioPublicacion(data.anioPublicacion);
+
+        setReseniaSinopsis(data.reseniaSinopsis?.replace(/<[^>]+>/g, '') || "");
+        setCantidadPaginas(data.cantidadPaginas ? data.cantidadPaginas.toString() : "");
+
+        const urlImagen = data.portadaUrl || "";
+        const urlSegura = urlImagen.replace("http://", "https://");
+        setPortadaUrl(urlSegura);
+        setPortadaPreview(urlSegura);
+
+        const categoriasGoogle = data.categorias || [];
+        const tagsSugeridos = obtenerTagsAutomaticos(categoriasGoogle);
+        setTags(prev => Array.from(new Set([...prev, ...tagsSugeridos])));
+        
+        const autorInvertido = invertirNombreComercial(data.autorPrincipal);
+        setAutorPrincipal(autorInvertido);
+        
+        if (autorInvertido) {
+          autocompletarCutter(autorInvertido);
+        }
+
+      } else {
+        const err = await res.json();
+        alert(err.mensaje || "No se encontraron datos para este ISBN.");
+      }
+    } catch (error) {
+      alert("No se pudo conectar con el servicio de búsqueda.");
+    } finally {
+      setBuscandoIsbn(false);
+    }
+  };
+
   const manejarInputTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
@@ -103,7 +286,6 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
   };
   const removerTag = (tagAEliminar: string) => setTags(tags.filter(t => t !== tagAEliminar));
 
-  // --- Funciones para Ejemplares (Se mantienen) ---
   const agregarEjemplar = () => setEjemplares([...ejemplares, { id: null, numeroInventario: "", observaciones: "", disponibleParaPrestamo: true }]);
   const removerEjemplar = (index: number) => setEjemplares(ejemplares.filter((_, i) => i !== index));
   const actualizarEjemplar = (index: number, campo: string, valor: any) => {
@@ -112,7 +294,6 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
     setEjemplares(nuevos);
   };
 
-  // --- 2. Guardar Cambios en la API (PUT) ---
   const guardarEdicion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (ejemplares.some(ej => ej.numeroInventario.trim() === "")) {
@@ -139,18 +320,15 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
         formData.append("cantidadPaginas", cantidadPaginas.toString());
       }
 
-      // LA IMAGEN LOCAL
       formData.append("usarPortadaLocal", usarPortadaLocal.toString());
       if (archivoPortada) {
         formData.append("archivoPortada", archivoPortada);
       }
 
-      // TAGS
       tags.forEach((tag, index) => {
         formData.append(`Tags[${index}]`, tag);
       });
 
-      // EJEMPLARES (Con ID y Disponibilidad)
       ejemplares.forEach((ej, index) => {
         if (ej.id) formData.append(`Ejemplares[${index}].Id`, ej.id.toString());
         formData.append(`Ejemplares[${index}].NumeroInventario`, ej.numeroInventario);
@@ -160,7 +338,6 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
 
       const res = await fetch(`http://localhost:5078/api/libros/${id}`, {
         method: "PUT",
-        // ¡OJO! Sin Content-Type, el navegador lo pone solo por ser FormData
         body: formData,
       });
 
@@ -207,7 +384,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
 
         <form onSubmit={guardarEdicion} className="space-y-10">
           
-          {/* SECCIÓN 1: DATOS BIBLIOGRÁFICOS + PORTADA (COPIADO DE CREACIÓN) */}
+          {/* SECCIÓN 1: DATOS BIBLIOGRÁFICOS + PORTADA */}
           <section>
             <h2 className="text-lg font-semibold text-purple-800 mb-5 bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center gap-2">
               <span>1️⃣</span> Ficha Bibliográfica Principal
@@ -222,10 +399,42 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                 <label className="block text-sm font-medium text-gray-700 mb-1">Subtítulo</label>
                 <input type="text" className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-gray-600" value={subtitulo} onChange={(e) => setSubtitulo(e.target.value)} />
               </div>
-              <div>
+
+              {/* --- CAMPO AUTOR CON AUTOCOMPLETADO Y CUTTER --- */}
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Autor Principal *</label>
-                <input type="text" required placeholder="Ej: Borges, Jorge Luis" className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none font-medium text-purple-900 bg-purple-50/50" value={autorPrincipal} onChange={(e) => setAutorPrincipal(e.target.value)} />
+                <input 
+                  type="text" 
+                  required 
+                  className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none font-medium text-purple-900 bg-purple-50/50" 
+                  placeholder="Ej: Borges, Jorge Luis" 
+                  value={autorPrincipal} 
+                  onChange={(e) => manejarCambioAutor(e.target.value)} 
+                  onBlur={() => {
+                    autocompletarCutter(autorPrincipal);
+                    setTimeout(() => setMostrarSugerenciasAutor(false), 200);
+                  }} 
+                />
+                
+                {/* Cajita flotante de Autores */}
+                {mostrarSugerenciasAutor && sugerenciasAutor.length > 0 && (
+                  <ul className="absolute z-10 w-full bg-white border border-gray-200 mt-1 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                    {sugerenciasAutor.map((autor, i) => (
+                      <li 
+                        key={i} 
+                        className="p-3 hover:bg-yellow-100 cursor-pointer text-sm font-medium text-gray-700 border-b last:border-0 transition" 
+                        onClick={() => seleccionarAutor(autor)}
+                      >
+                        ✍️ {autor}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[10px] text-amber-600 mt-1 font-medium bg-amber-50 inline-block px-2 py-0.5 rounded border border-amber-200">
+                  ⚠️ Ojo: Revisar autores con apellidos compuestos.
+                </p>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Editorial</label>
                 <input type="text" className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" value={editorial} onChange={(e) => setEditorial(e.target.value)} />
@@ -237,12 +446,47 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">ISBN</label>
-                  <input type="text" placeholder="978..." className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none font-mono text-sm" value={isbn} onChange={(e) => setIsbn(e.target.value)} />
+                  <input 
+                    type="text" 
+                    placeholder="978..."
+                    className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none mb-2" 
+                    value={isbn} 
+                    onChange={(e) => setIsbn(e.target.value)} 
+                  />
+                  </div>
+                  <div className="flex col-span-2">
+                    <div><span className="text-sm font-medium text-gray-700 mr-2">Origen Datos:</span></div>
+                  <div>
+                    
+                      <select 
+                        className="border border-gray-300 p-2 rounded-lg bg-gray-50 text-sm font-medium outline-none focus:ring-2 focus:ring-purple-500  mr-2"
+                        value={proveedorDatos}
+                        onChange={(e) => setProveedorDatos(e.target.value)}
+                      >
+                        <option value="todas">🚀 Todas </option>
+                        <option value="google">🔍 Solo Google Books</option>
+                        <option value="openlibrary">📚 Solo Open Library</option>
+                      </select>
+                      </div>
+                      <div>
+                  <button 
+                    type="button" 
+                    onClick={buscarDatosPorIsbn}
+                    disabled={buscandoIsbn}
+                    className={`w-full justify-center px-3 py-2 rounded-lg border transition flex items-center gap-2 text-sm font-bold ${buscandoIsbn ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200'}`}
+                    title="Buscar datos automáticamente"
+                  >
+                    {buscandoIsbn ? '⏳ Buscando...' : '✨ Autocompletar'}
+                  </button>
+                  </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+                  </div>
+                
+              
+            
 
-            {/* --- PANEL DE PORTADA Y DATOS EXPANSIBLES (NUEVO EN EDICIÓN) --- */}
+            {/* --- PANEL DE PORTADA Y DATOS EXPANSIBLES --- */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl shadow-inner">
               
               {/* COLUMNA 1: PREVIEW DE LA TAPA */}
@@ -250,7 +494,6 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Portada Actual</h4>
                 <div className="w-full h-56 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden shadow-sm">
                   {portadaPreview ? (
-                    // ¡IMPORTANTE! Agregamos el backendUrl para fotos locales
                     <img src={portadaPreview.startsWith('/') ? `http://localhost:5078${portadaPreview}` : portadaPreview} alt="Tapa del libro" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-5xl text-gray-300">🖼️</span>
@@ -261,7 +504,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
               {/* COLUMNA 2, 3 y 4: DATOS EXPANSIBLES */}
               <div className="col-span-1 md:col-span-3 space-y-4">
                 
-                {/* Opciones Locales (Check y Subida) (NUEVO VISUALMENTE) */}
+                {/* Opciones Locales */}
                 <div className="border-2 border-dashed border-purple-200 p-4 rounded-lg bg-white mb-3 shadow-inner">
                   <h4 className="text-sm font-bold text-purple-900 mb-2 flex items-center gap-1"><span>💾</span> Opciones Locales (Autonomía)</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -272,7 +515,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                         onChange={(e) => setUsarPortadaLocal(e.target.checked)} 
                         className="w-5 h-5 text-purple-600 focus:ring-purple-500 rounded border-gray-300"
                       />
-                      Usar Portada Local (A prueba de cortes de internet)
+                      Usar Portada Local
                     </label>
                     
                     <div>
@@ -284,9 +527,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
                             setArchivoPortada(file);
-                            setUsarPortadaLocal(true); // Si sube archivo, marcamos usar local automáticamente
-                            
-                            // Creamos preview local para Next.js (blob:...)
+                            setUsarPortadaLocal(true);
                             setPortadaPreview(URL.createObjectURL(file));
                           }
                         }}
@@ -310,7 +551,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
             </div>
           </section>
 
-          {/* SECCIÓN UBICACIÓN Y TAGS (ACTUALIZADA UI) */}
+          {/* SECCIÓN UBICACIÓN Y TAGS */}
           <section>
             <h2 className="text-lg font-semibold text-purple-800 mb-5 bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center gap-2">
               <span>2️⃣</span> Clasificación y Materias
@@ -328,6 +569,16 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
             
             <div className="border border-gray-300 p-5 rounded-xl bg-gray-100">
               <label className="block text-sm font-bold text-gray-700 mb-3">Temas y Etiquetas (Escribí y apretá <kbd className="bg-gray-200 px-1.5 py-0.5 rounded border border-gray-300 font-sans text-xs">Enter</kbd> o coma)</label>
+              {tags.length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => setTags([])} 
+                    className="text-xs text-red-600 hover:text-red-800 font-bold bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-200 transition flex items-center gap-1 shadow-sm mb-1"
+                    title="Borrar todas las etiquetas"
+                  >
+                    🗑️ Limpiar todo ({tags.length})
+                  </button>
+                )}
               <div className="flex flex-wrap gap-2.5 mb-4 p-2 min-h-[50px] bg-white rounded-lg border border-gray-200 shadow-inner">
                 {tags.map((tag, index) => (
                   <span key={index} className="bg-purple-600 text-white text-sm font-bold px-3 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
@@ -336,11 +587,39 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                 ))}
                 {tags.length === 0 && <span className="text-gray-400 text-sm italic p-1">No hay etiquetas asignadas...</span>}
               </div>
-              <input type="text" placeholder="Ej: Novela histórica, Siglo XX, Borges..." className="w-full border-2 p-3 rounded-lg focus:border-purple-500 focus:ring-0 outline-none bg-white font-medium" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={manejarInputTag} />
+              
+              {/* --- CAMPO TAGS CON AUTOCOMPLETADO TESAURO --- */}
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="Buscar en el Tesauro (Ej: Educación, Ficción...)" 
+                  className="w-full border-2 p-3 rounded-lg focus:border-purple-500 focus:ring-0 outline-none bg-white font-medium" 
+                  value={tagInput} 
+                  onChange={(e) => manejarCambioTag(e.target.value)}
+                  onKeyDown={manejarInputTag}
+                  onBlur={() => setTimeout(() => setMostrarSugerenciasTags(false), 200)}
+                />
+
+                {/* Cajita flotante del Tesauro */}
+                {mostrarSugerenciasTags && sugerenciasTags.length > 0 && (
+                  <ul className="absolute z-10 w-full bg-white border border-purple-200 mt-1 rounded-xl shadow-2xl max-h-56 overflow-y-auto">
+                    {sugerenciasTags.map((tag, i) => (
+                      <li 
+                        key={i} 
+                        className="p-3 hover:bg-purple-100 cursor-pointer text-sm font-bold text-purple-900 border-b border-purple-50 last:border-0 transition flex items-center gap-2" 
+                        onClick={() => seleccionarTag(tag)}
+                      >
+                        🏷️ {tag}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
             </div>
           </section>
 
-          {/* SECCIÓN EJEMPLARES (SE MANTIENE IGUAL, ESTÁ PERFECTA) */}
+          {/* SECCIÓN EJEMPLARES */}
           <section>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 bg-slate-800 text-white p-3 px-4 rounded-lg shadow-md gap-3">
               <h2 className="text-lg font-semibold flex items-center gap-2"><span>3️⃣</span> Inventario de Copias Físicas</h2>
@@ -375,7 +654,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
             </div>
           </section>
 
-          {/* BOTONERA FINAL (ACTUALIZADA UI) */}
+          {/* BOTONERA FINAL */}
           <div className="flex flex-col md:flex-row justify-end gap-3 pt-8 border-t border-gray-100 mt-10">
             <Link href={`/libros/${id}`} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition text-center order-2 md:order-1 border border-gray-200 md:border-none">
               Cancelar y Volver

@@ -23,6 +23,7 @@ export default function NuevoLibroCatalogo() {
   const [portadaPreview, setPortadaPreview] = useState<string | null>(null);
   const [usarPortadaLocal, setUsarPortadaLocal] = useState(false); // El 'bool check'
   const [archivoPortada, setArchivoPortada] = useState<File | null>(null); // El archivo subido
+  const [proveedorDatos, setProveedorDatos] = useState("todas");
 
   // NUEVO: Estados para los Tags
   const [tagInput, setTagInput] = useState("");
@@ -32,6 +33,59 @@ export default function NuevoLibroCatalogo() {
   // Estados de los Ejemplares Físicos
   const [ejemplares, setEjemplares] = useState([{ numeroInventario: "", observaciones: "" }]);
   const [cargando, setCargando] = useState(false);
+
+  const [sugerenciasAutor, setSugerenciasAutor] = useState<string[]>([]);
+  const [mostrarSugerenciasAutor, setMostrarSugerenciasAutor] = useState(false);
+
+  const [sugerenciasTags, setSugerenciasTags] = useState<string[]>([]);
+  const [mostrarSugerenciasTags, setMostrarSugerenciasTags] = useState(false);
+
+  // 1. Buscador en vivo de Autores
+  const manejarCambioAutor = async (texto: string) => {
+    setAutorPrincipal(texto);
+    if (texto.length >= 2) {
+      try {
+        const res = await fetch(`http://localhost:5078/api/libros/autores/buscar?q=${texto}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSugerenciasAutor(data);
+          setMostrarSugerenciasAutor(true);
+        }
+      } catch (e) { console.error(e); }
+    } else {
+      setMostrarSugerenciasAutor(false);
+    }
+  };
+
+  const seleccionarAutor = (autor: string) => {
+    setAutorPrincipal(autor);
+    setMostrarSugerenciasAutor(false);
+  };
+
+  // 2. Buscador en vivo de Tags (Tesauro)
+  const manejarCambioTag = async (texto: string) => {
+    setTagInput(texto);
+    if (texto.length >= 2) {
+      try {
+        const res = await fetch(`http://localhost:5078/api/libros/tags/buscar?q=${texto}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSugerenciasTags(data);
+          setMostrarSugerenciasTags(true);
+        }
+      } catch (e) { console.error(e); }
+    } else {
+      setMostrarSugerenciasTags(false);
+    }
+  };
+
+  const seleccionarTag = (tag: string) => {
+    if (!tags.includes(tag)) {
+      setTags([...tags, tag]);
+    }
+    setTagInput("");
+    setMostrarSugerenciasTags(false);
+  };
 
   // --- Funciones para Tags ---
   const manejarInputTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -135,7 +189,7 @@ export default function NuevoLibroCatalogo() {
     setTitulo(""); setSubtitulo(""); setAutorPrincipal(""); setEditorial(""); setAnioPublicacion("");
 
     try {
-      const res = await fetch(`http://localhost:5078/api/libros/lookup/isbn/${isbn}`);
+      const res = await fetch(`http://localhost:5078/api/libros/lookup/isbn/${isbn}?proveedor=${proveedorDatos}`);
       
       if (res.ok) {
         const data = await res.json();
@@ -325,7 +379,9 @@ export default function NuevoLibroCatalogo() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Subtítulo</label>
                 <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={subtitulo} onChange={(e) => setSubtitulo(e.target.value)} />
               </div>
-              <div className="col-span-2 md:col-span-1">
+              
+              {/* --- CAMPO AUTOR CON AUTOCOMPLETADO --- */}
+              <div className="col-span-2 md:col-span-1 relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Autor Principal *</label>
                 <input 
                   type="text" 
@@ -333,16 +389,35 @@ export default function NuevoLibroCatalogo() {
                   className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" 
                   placeholder="Ej: Borges, Jorge Luis" 
                   value={autorPrincipal} 
-                  onChange={(e) => setAutorPrincipal(e.target.value)} 
-                  onBlur={() => autocompletarCutter(autorPrincipal)} 
+                  onChange={(e) => manejarCambioAutor(e.target.value)} 
+                  onBlur={() => {
+                    autocompletarCutter(autorPrincipal);
+                    setTimeout(() => setMostrarSugerenciasAutor(false), 200);
+                  }} 
                 />
+                
+                {/* Cajita flotante de Autores */}
+                {mostrarSugerenciasAutor && sugerenciasAutor.length > 0 && (
+                  <ul className="absolute z-10 w-full bg-white border border-gray-200 mt-1 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                    {sugerenciasAutor.map((autor, i) => (
+                      <li 
+                        key={i} 
+                        className="p-3 hover:bg-purple-100 cursor-pointer text-sm font-medium text-gray-700 border-b last:border-0 transition" 
+                        onClick={() => seleccionarAutor(autor)}
+                      >
+                        ✍️ {autor}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
                 <p className="text-xs text-amber-600 mt-1 font-medium bg-amber-50 inline-block px-2 py-0.5 rounded border border-amber-200">
                   ⚠️ Ojo: Revisar autores con apellidos compuestos (ej: García Márquez).
                 </p>
               </div>
            
 
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Reseña / Sinopsis</label>
               <textarea 
                 rows={5}
@@ -353,11 +428,11 @@ export default function NuevoLibroCatalogo() {
               />
             </div>
           </div>
-              <div>
+              <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Editorial</label>
                 <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={editorial} onChange={(e) => setEditorial(e.target.value)} />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Año Pub.</label>
                   <input type="text" placeholder="Ej: 2010" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={anioPublicacion} onChange={(e) => setAnioPublicacion(e.target.value)} />
@@ -371,12 +446,22 @@ export default function NuevoLibroCatalogo() {
                     value={isbn} 
                     onChange={(e) => setIsbn(e.target.value)} 
                   />
+                  
+                      <select 
+                        className="border border-gray-300 p-2 rounded-lg bg-gray-50 text-sm font-medium outline-none focus:ring-2 focus:ring-purple-500 flex-1 mb-2 w-full"
+                        value={proveedorDatos}
+                        onChange={(e) => setProveedorDatos(e.target.value)}
+                      >
+                        <option value="todas">🚀 Todas </option>
+                        <option value="google">🔍 Solo Google Books</option>
+                        <option value="openlibrary">📚 Solo Open Library</option>
+                      </select>
                   <button 
                     type="button" 
                     onClick={buscarDatosPorIsbn}
                     disabled={buscandoIsbn}
                     className={`w-full justify-center px-3 py-2 rounded-lg border transition flex items-center gap-2 text-sm font-bold ${buscandoIsbn ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200'}`}
-                    title="Buscar datos automáticamente en Google Books"
+                    title="Buscar datos automáticamente"
                   >
                     {buscandoIsbn ? '⏳ Buscando...' : '✨ Autocompletar desde Internet'}
                   </button>
@@ -419,7 +504,7 @@ export default function NuevoLibroCatalogo() {
                 <input 
                   type="text" 
                   placeholder="Se completa automáticamente"
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none text-xs font-mono text-gray-600 bg-gray-50" 
+                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none text-xs font-mono text-gray-600 bg-gray-50 mb-4" 
                   value={portadaUrl} 
                   onChange={(e) => {
                     setPortadaUrl(e.target.value);
@@ -448,7 +533,7 @@ export default function NuevoLibroCatalogo() {
             onChange={(e) => {
               if (e.target.files && e.target.files[0]) {
                 setArchivoPortada(e.target.files[0]);
-                setUsarPortadaLocal(true); // Si sube archivo, marcamos usar local automáticamente
+                setUsarPortadaLocal(true); 
               }
             }}
           />
@@ -461,13 +546,23 @@ export default function NuevoLibroCatalogo() {
             </div>
           </section>
 
-          {/* NUEVA SECCIÓN: ETIQUETAS (TAGS) */}
+          {/* NUEVA SECCIÓN: ETIQUETAS (TAGS) CON TESAURO */}
           <section>
             <h2 className="text-lg font-semibold text-purple-800 mb-4 bg-purple-50 p-2 rounded">2. Etiquetas y Materias</h2>
             <div className="border border-gray-300 p-4 rounded-lg bg-gray-50">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Agregar Tags (Escribí el tema y apretá <kbd className="bg-gray-200 px-1 rounded">Enter</kbd> o coma)
               </label>
+              {tags.length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => setTags([])} 
+                    className="text-xs text-red-600 hover:text-red-800 font-bold bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-200 transition flex items-center gap-1 shadow-sm mb-3"
+                    title="Borrar todas las etiquetas"
+                  >
+                    🗑️ Limpiar todo ({tags.length})
+                  </button>
+                )}
               
               <div className="flex flex-wrap gap-2 mb-3">
                 {tags.map((tag, index) => (
@@ -478,14 +573,34 @@ export default function NuevoLibroCatalogo() {
                 ))}
               </div>
 
-              <input 
-                type="text" 
-                placeholder="Ej: Historia Argentina, Novela, Ficción..." 
-                className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" 
-                value={tagInput} 
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={manejarInputTag}
-              />
+              {/* --- CAMPO TAGS CON AUTOCOMPLETADO TESAURO --- */}
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="Buscar en el Tesauro (Ej: Educación, Ficción...)" 
+                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" 
+                  value={tagInput} 
+                  onChange={(e) => manejarCambioTag(e.target.value)}
+                  onKeyDown={manejarInputTag}
+                  onBlur={() => setTimeout(() => setMostrarSugerenciasTags(false), 200)}
+                />
+
+                {/* Cajita flotante del Tesauro */}
+                {mostrarSugerenciasTags && sugerenciasTags.length > 0 && (
+                  <ul className="absolute z-10 w-full bg-white border border-purple-200 mt-1 rounded-xl shadow-2xl max-h-56 overflow-y-auto">
+                    {sugerenciasTags.map((tag, i) => (
+                      <li 
+                        key={i} 
+                        className="p-3 hover:bg-purple-100 cursor-pointer text-sm font-bold text-purple-900 border-b border-purple-50 last:border-0 transition flex items-center gap-2" 
+                        onClick={() => seleccionarTag(tag)}
+                      >
+                        🏷️ {tag}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
             </div>
           </section>
 
@@ -550,7 +665,6 @@ export default function NuevoLibroCatalogo() {
 
           {/* BOTONES */}
           <div className="flex justify-end gap-3 pt-6 border-t mt-8">
-            {/* <Link href="/" className="px-6 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded transition">Cancelar</Link> */}
             <button type="submit" disabled={cargando} className={`px-8 py-3 rounded-xl font-bold text-white transition shadow-lg ${cargando ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'}`}>
               {cargando ? 'Guardando...' : 'Guardar Ficha'}
             </button>
