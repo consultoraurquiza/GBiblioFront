@@ -110,6 +110,15 @@ export default function CatalogoOPAC() {
             <Link href="/libros/nuevo" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded text-sm font-bold transition shadow-lg">
               + Ingresar Libro
             </Link>
+            <div className="w-px h-8 bg-slate-600 mx-1 hidden md:block"></div> {/* Separador vertical */}
+            
+            <Link 
+              href="/panol" 
+              className="bg-blue-700 hover:bg-blue-600 border border-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-md flex items-center gap-2"
+            >
+              🔌 Pañol Tecnológico
+            </Link>
+            
           </div>
         </div>
       </nav>
