@@ -24,6 +24,7 @@ export default function NuevoLibroCatalogo() {
   const [usarPortadaLocal, setUsarPortadaLocal] = useState(false); // El 'bool check'
   const [archivoPortada, setArchivoPortada] = useState<File | null>(null); // El archivo subido
   const [proveedorDatos, setProveedorDatos] = useState("todas");
+  const [proveedorScraper, setProveedorScraper] = useState("yenny");
 
   // NUEVO: Estados para los Tags
   const [tagInput, setTagInput] = useState("");
@@ -39,6 +40,139 @@ export default function NuevoLibroCatalogo() {
 
   const [sugerenciasTags, setSugerenciasTags] = useState<string[]>([]);
   const [mostrarSugerenciasTags, setMostrarSugerenciasTags] = useState(false);
+
+ // --- NUEVOS ESTADOS PARA EL BUSCADOR VISUAL ---
+  const [modalScraperAbierto, setModalScraperAbierto] = useState(false);
+  const [resultadosScraper, setResultadosScraper] = useState<any[]>([]);
+  const [buscandoScraper, setBuscandoScraper] = useState(false);
+
+  // --- FUNCIÓN PARA BUSCAR POR TÍTULO ---
+  const buscarPorTituloScraper = async () => {
+    if (!titulo || titulo.trim() === "") {
+      alert("⚠️ Primero escribí al menos una parte del Título para poder buscar.");
+      return;
+    }
+
+    setBuscandoScraper(true);
+    setModalScraperAbierto(true); // Abrimos la ventana flotante en modo "cargando"
+    setResultadosScraper([]);
+
+    try {
+      const res = await fetch(`http://localhost:5078/api/libros/scraper/buscar?titulo=${encodeURIComponent(titulo)}&proveedor=${proveedorScraper}`);
+      
+      if (res.ok) {
+        const data = await res.json();
+        
+        // BLINDAJE: Verificamos si realmente es una lista (Array)
+        if (Array.isArray(data)) {
+          setResultadosScraper(data);
+        } 
+        // Si no es un Array, pero tiene un mensaje (Ej: el pedido de radiografía)
+        else if (data.mensaje) {
+          alert("🕵️‍♂️ El Sabueso dice: " + data.mensaje);
+          
+          // Si nos mandó el HTML gigante para que lo analicemos, lo tiramos por consola
+          if (data.html_crudo) {
+            console.log("=== RADIOGRAFÍA ===");
+            console.log(data.html_crudo);
+          }
+          
+          setResultadosScraper([]); // Lo forzamos a ser lista vacía para que no explote el .map
+        }
+      } else {
+        const errorData = await res.json();
+        alert("Error: " + (errorData.mensaje || "No se pudo conectar con el proveedor."));
+        setModalScraperAbierto(false);
+      }
+    } catch (error) {
+      alert("Error de conexión con el servidor local.");
+      setModalScraperAbierto(false);
+    } finally {
+      setBuscandoScraper(false);
+    }
+  };
+
+  // --- FUNCIÓN PARA CUANDO EL USUARIO HACE CLIC EN "ELEGIR ESTE" ---
+  const seleccionarLibroScraper = async (libro: any) => {
+
+    // --- FUNCIÓN INTERNA PARA INVERTIR NOMBRES ---
+    const formatearAutor = (nombreSucio: string) => {
+      if (!nombreSucio || nombreSucio === "Autor Desconocido") return "";
+      if (nombreSucio.includes(",")) return nombreSucio; // Ya está invertido
+
+      const partes = nombreSucio.trim().split(/\s+/);
+      if (partes.length <= 1) return nombreSucio;
+
+      const apellido = partes.pop(); // Saca el último
+      const nombres = partes.join(" "); // Junta el resto
+      return `${apellido}, ${nombres}`;
+    };
+
+
+
+    // 1. Cargamos lo que ya sabemos rapidito para que el usuario vea acción
+    setTitulo(libro.titulo);
+
+    const autorInicial = formatearAutor(libro.autor);
+    setAutorPrincipal(autorInicial);
+    if (autorInicial) autocompletarCutter(autorInicial);
+
+    if (libro.portadaUrl) {
+      setPortadaUrl(libro.portadaUrl);
+      setPortadaPreview(libro.portadaUrl); 
+    }
+
+    // 2. Si el libro tiene un link para investigar, hacemos el 2do Scrape
+    if (libro.linkComercial) {
+      setBuscandoScraper(true); // Ponemos el modal a cargar de nuevo
+      
+      try {
+        const res = await fetch(`http://localhost:5078/api/libros/scraper/detalle?url=${encodeURIComponent(libro.linkComercial)}&autorOriginal=${encodeURIComponent(libro.autor)}`);
+        
+        if (res.ok) {
+          const detalle = await res.json();
+          
+          // --- NUEVOS DATOS FINOS ---
+          
+          // Pisamos el título viejo con el título limpio (sin subtítulo pegado)
+          if (detalle.tituloLimpio) setTitulo(detalle.tituloLimpio);
+          if (detalle.subtitulo) setSubtitulo(detalle.subtitulo);
+          if (detalle.autor && detalle.autor !== "" && detalle.autor !== "Autor Desconocido") {
+            setAutorPrincipal(detalle.autor);
+            if (typeof autocompletarCutter === 'function') autocompletarCutter(detalle.autor);
+          }
+          // Resumen
+          if (detalle.resumen && detalle.resumen !== "") setReseniaSinopsis(detalle.resumen);
+          else if (libro.resumen) setReseniaSinopsis(libro.resumen); 
+          
+          // Tabla técnica
+          if (detalle.editorial) setEditorial(detalle.editorial);
+          if (detalle.paginas) setCantidadPaginas(detalle.paginas);
+          if (detalle.anio) setAnioPublicacion(detalle.anio);
+          if (detalle.autor && detalle.autor !== "") {
+            setAutorPrincipal(detalle.autor);
+            // Si tenés la función del cutter, la ejecutamos
+            if (typeof autocompletarCutter === 'function') autocompletarCutter(detalle.autor);
+          };//  else {
+          //   setAutorPrincipal(""); // Si no lo encontró, lo dejamos vacío para carga manual
+          // }
+          // Solo pisamos el ISBN si el campo está vacío (para no borrarle uno manual al usuario)
+          if (detalle.isbn && (!isbn || isbn.trim() === "")) setIsbn(detalle.isbn);
+          
+        }
+      } catch (error) {
+        console.error("Falló el 2do scrape", error);
+        if (libro.resumen) setReseniaSinopsis(libro.resumen);
+      } finally {
+        setBuscandoScraper(false);
+      }
+    } else {
+      // Si por algún motivo no vino link, usamos el resumen cortito
+      if (libro.resumen) setReseniaSinopsis(libro.resumen);
+    }
+
+    setModalScraperAbierto(false); // Cerramos la ventana mágica
+  };
 
   // 1. Buscador en vivo de Autores
   const manejarCambioAutor = async (texto: string) => {
@@ -373,7 +507,42 @@ export default function NuevoLibroCatalogo() {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Título *</label>
-                <input type="text" required className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+                <input 
+                  type="text" 
+                  required 
+                  className="w-full border-2 border-gray-300 p-3 rounded-lg focus:ring-0 focus:border-blue-500" 
+                  value={titulo} 
+                  onChange={(e) => setTitulo(e.target.value)} 
+                />
+                {/* NUEVO BOTÓN: EL SCRAPER */}
+              {/* BOTÓN DEL SABUESO */}
+                {/* NUEVO SELECTOR DE BASES */}
+                
+                <div className="flex space-betwen pt-2 "><select 
+                  className="border-2 border-gray-300 p-3 rounded-lg font-bold text-gray-700 outline-none focus:border-orange-500"
+                  value={proveedorScraper}
+                  onChange={(e) => setProveedorScraper(e.target.value)}
+                >
+                  <option value="yenny">Yenny</option>
+                  {/* <option value="cuspide">Cúspide</option>                   */}
+                  {/* <option value="buscalibre">BuscaLibre</option> */ }
+                </select>
+
+                <button 
+                  type="button" 
+                  onClick={buscarPorTituloScraper}
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-4 rounded-lg font-bold transition shadow-sm flex items-center gap-2 whitespace-nowrap ml-2"
+                >
+                  🕵️‍♂️ Buscar
+                </button>
+                
+                
+                
+                <span className="text-xs text-amber-600  font-medium bg-amber-50 inline-block px-2 py-0.5 rounded border border-amber-200 ml-4">
+                  ⚠️ El mismo campo de titulo para buscar, puede usarse para buscar ingresando el nombre del autor
+                </span>
+                
+              </div>
               </div>
               <div className="col-span-2 md:col-span-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Subtítulo</label>
@@ -465,6 +634,7 @@ export default function NuevoLibroCatalogo() {
                   >
                     {buscandoIsbn ? '⏳ Buscando...' : '✨ Autocompletar desde Internet'}
                   </button>
+                  
                 </div>
               </div>
             
@@ -671,6 +841,81 @@ export default function NuevoLibroCatalogo() {
           </div>
         </form>
       </div>
+
+
+      {/* ========================================== */}
+      {/* MODAL DEL SCRAPER (VENTANA FLOTANTE)         */}
+      {/* ========================================== */}
+      {modalScraperAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] border-2 border-orange-500">
+            
+            {/* Cabecera del Modal */}
+            <div className="bg-orange-500 text-white p-4 flex justify-between items-center shadow-md z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🕵️‍♂️</span>
+                <h3 className="font-bold text-lg tracking-wider">Resultados de Librerías Comerciales</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setModalScraperAbierto(false)} 
+                className="text-white hover:text-orange-200 text-3xl font-black leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Cuerpo del Modal (Lista de Libros) */}
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+              {buscandoScraper ? (
+                <div className="text-center py-16 text-orange-600 font-bold animate-pulse text-xl flex flex-col items-center gap-4">
+                  <span className="text-5xl animate-spin">⏳</span>
+                  Rastreando catálogos en la web...
+                </div>
+              ) : resultadosScraper.length === 0 ? (
+                <div className="text-center py-16 text-gray-500 font-medium text-lg">
+                  No se encontraron libros con ese título. <br/>Intentá escribir una palabra clave más corta (Ej: "Matematica" en vez de "Libro de Matematica 3").
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {resultadosScraper.map((libro, idx) => (
+                    <div key={idx} className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-lg hover:border-orange-300 transition items-center">
+                      
+                      {/* Portada */}
+                      <div className="w-16 h-24 bg-gray-100 rounded-lg shadow-sm flex-shrink-0 overflow-hidden border border-gray-200">
+                        {libro.portadaUrl ? (
+                          <img src={libro.portadaUrl} alt="Portada" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 font-bold text-center p-1">Sin Foto</div>
+                        )}
+                      </div>
+                      
+                      {/* Datos */}
+                      <div className="flex-1">
+                        <h4 className="font-bold text-gray-800 text-lg leading-tight mb-1">{libro.titulo}</h4>
+                        <p className="text-sm text-blue-800 font-bold">{libro.autor}</p>
+                        <p className="text-xs text-gray-500 mt-2 italic bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">
+                          {libro.resumen}
+                        </p>
+                      </div>
+                      
+                      {/* Botón de Selección */}
+                      <button
+                        type="button"
+                        onClick={() => seleccionarLibroScraper(libro)}
+                        className="bg-green-100 text-green-800 border border-green-300 hover:bg-green-500 hover:text-white px-5 py-3 rounded-xl font-bold transition shadow-sm whitespace-nowrap flex flex-col items-center"
+                      >
+                        <span>✅ Elegir</span>
+                      </button>
+
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
