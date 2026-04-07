@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -29,7 +29,6 @@ export default function NuevoLibroCatalogo() {
   // NUEVO: Estados para los Tags
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
-  //const [tagsSeleccionados, setTagsSeleccionados] = useState<string[]>([]);
 
   // Estados de los Ejemplares Físicos
   const [ejemplares, setEjemplares] = useState([{ numeroInventario: "", observaciones: "" }]);
@@ -41,10 +40,21 @@ export default function NuevoLibroCatalogo() {
   const [sugerenciasTags, setSugerenciasTags] = useState<string[]>([]);
   const [mostrarSugerenciasTags, setMostrarSugerenciasTags] = useState(false);
 
- // --- NUEVOS ESTADOS PARA EL BUSCADOR VISUAL ---
+  // --- NUEVOS ESTADOS PARA EL BUSCADOR VISUAL ---
   const [modalScraperAbierto, setModalScraperAbierto] = useState(false);
   const [resultadosScraper, setResultadosScraper] = useState<any[]>([]);
   const [buscandoScraper, setBuscandoScraper] = useState(false);
+
+  // CONFIGURACIÓN Y TEMA
+  const [config, setConfig] = useState<any>(null);
+  const claseTema = config ? `tema-${config.temaId}` : 'tema-lumina';
+
+  useEffect(() => {
+    fetch("http://localhost:5078/api/configuracion")
+      .then(res => res.json())
+      .then(data => setConfig(data))
+      .catch(err => console.error(err));
+  }, []);
 
   // --- FUNCIÓN PARA BUSCAR POR TÍTULO ---
   const buscarPorTituloScraper = async () => {
@@ -54,7 +64,7 @@ export default function NuevoLibroCatalogo() {
     }
 
     setBuscandoScraper(true);
-    setModalScraperAbierto(true); // Abrimos la ventana flotante en modo "cargando"
+    setModalScraperAbierto(true); 
     setResultadosScraper([]);
 
     try {
@@ -63,21 +73,16 @@ export default function NuevoLibroCatalogo() {
       if (res.ok) {
         const data = await res.json();
         
-        // BLINDAJE: Verificamos si realmente es una lista (Array)
         if (Array.isArray(data)) {
           setResultadosScraper(data);
         } 
-        // Si no es un Array, pero tiene un mensaje (Ej: el pedido de radiografía)
         else if (data.mensaje) {
           alert("🕵️‍♂️ El Sabueso dice: " + data.mensaje);
-          
-          // Si nos mandó el HTML gigante para que lo analicemos, lo tiramos por consola
           if (data.html_crudo) {
             console.log("=== RADIOGRAFÍA ===");
             console.log(data.html_crudo);
           }
-          
-          setResultadosScraper([]); // Lo forzamos a ser lista vacía para que no explote el .map
+          setResultadosScraper([]); 
         }
       } else {
         const errorData = await res.json();
@@ -94,25 +99,19 @@ export default function NuevoLibroCatalogo() {
 
   // --- FUNCIÓN PARA CUANDO EL USUARIO HACE CLIC EN "ELEGIR ESTE" ---
   const seleccionarLibroScraper = async (libro: any) => {
-
-    // --- FUNCIÓN INTERNA PARA INVERTIR NOMBRES ---
     const formatearAutor = (nombreSucio: string) => {
       if (!nombreSucio || nombreSucio === "Autor Desconocido") return "";
-      if (nombreSucio.includes(",")) return nombreSucio; // Ya está invertido
+      if (nombreSucio.includes(",")) return nombreSucio; 
 
       const partes = nombreSucio.trim().split(/\s+/);
       if (partes.length <= 1) return nombreSucio;
 
-      const apellido = partes.pop(); // Saca el último
-      const nombres = partes.join(" "); // Junta el resto
+      const apellido = partes.pop(); 
+      const nombres = partes.join(" "); 
       return `${apellido}, ${nombres}`;
     };
 
-
-
-    // 1. Cargamos lo que ya sabemos rapidito para que el usuario vea acción
     setTitulo(libro.titulo);
-
     const autorInicial = formatearAutor(libro.autor);
     setAutorPrincipal(autorInicial);
     if (autorInicial) autocompletarCutter(autorInicial);
@@ -122,43 +121,27 @@ export default function NuevoLibroCatalogo() {
       setPortadaPreview(libro.portadaUrl); 
     }
 
-    // 2. Si el libro tiene un link para investigar, hacemos el 2do Scrape
     if (libro.linkComercial) {
-      setBuscandoScraper(true); // Ponemos el modal a cargar de nuevo
-      
+      setBuscandoScraper(true); 
       try {
         const res = await fetch(`http://localhost:5078/api/libros/scraper/detalle?url=${encodeURIComponent(libro.linkComercial)}&autorOriginal=${encodeURIComponent(libro.autor)}`);
         
         if (res.ok) {
           const detalle = await res.json();
-          
-          // --- NUEVOS DATOS FINOS ---
-          
-          // Pisamos el título viejo con el título limpio (sin subtítulo pegado)
           if (detalle.tituloLimpio) setTitulo(detalle.tituloLimpio);
           if (detalle.subtitulo) setSubtitulo(detalle.subtitulo);
           if (detalle.autor && detalle.autor !== "" && detalle.autor !== "Autor Desconocido") {
             setAutorPrincipal(detalle.autor);
             if (typeof autocompletarCutter === 'function') autocompletarCutter(detalle.autor);
           }
-          // Resumen
           if (detalle.resumen && detalle.resumen !== "") setReseniaSinopsis(detalle.resumen);
           else if (libro.resumen) setReseniaSinopsis(libro.resumen); 
           
-          // Tabla técnica
           if (detalle.editorial) setEditorial(detalle.editorial);
           if (detalle.paginas) setCantidadPaginas(detalle.paginas);
           if (detalle.anio) setAnioPublicacion(detalle.anio);
-          if (detalle.autor && detalle.autor !== "") {
-            setAutorPrincipal(detalle.autor);
-            // Si tenés la función del cutter, la ejecutamos
-            if (typeof autocompletarCutter === 'function') autocompletarCutter(detalle.autor);
-          };//  else {
-          //   setAutorPrincipal(""); // Si no lo encontró, lo dejamos vacío para carga manual
-          // }
-          // Solo pisamos el ISBN si el campo está vacío (para no borrarle uno manual al usuario)
-          if (detalle.isbn && (!isbn || isbn.trim() === "")) setIsbn(detalle.isbn);
           
+          if (detalle.isbn && (!isbn || isbn.trim() === "")) setIsbn(detalle.isbn);
         }
       } catch (error) {
         console.error("Falló el 2do scrape", error);
@@ -167,14 +150,11 @@ export default function NuevoLibroCatalogo() {
         setBuscandoScraper(false);
       }
     } else {
-      // Si por algún motivo no vino link, usamos el resumen cortito
       if (libro.resumen) setReseniaSinopsis(libro.resumen);
     }
-
-    setModalScraperAbierto(false); // Cerramos la ventana mágica
+    setModalScraperAbierto(false); 
   };
 
-  // 1. Buscador en vivo de Autores
   const manejarCambioAutor = async (texto: string) => {
     setAutorPrincipal(texto);
     if (texto.length >= 2) {
@@ -196,7 +176,6 @@ export default function NuevoLibroCatalogo() {
     setMostrarSugerenciasAutor(false);
   };
 
-  // 2. Buscador en vivo de Tags (Tesauro)
   const manejarCambioTag = async (texto: string) => {
     setTagInput(texto);
     if (texto.length >= 2) {
@@ -221,9 +200,7 @@ export default function NuevoLibroCatalogo() {
     setMostrarSugerenciasTags(false);
   };
 
-  // --- Funciones para Tags ---
   const manejarInputTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Si aprieta Enter o la coma (,) agregamos el tag
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       const nuevoTag = tagInput.trim();
@@ -238,23 +215,48 @@ export default function NuevoLibroCatalogo() {
     setTags(tags.filter(t => t !== tagAEliminar));
   };
 
-  // 2. FUNCIÓN DE TRADUCCIÓN AUTOMÁTICA DE TAGS
+  const traductorCategorias: { [key: string]: string[] } = {
+    "Fiction": ["Literatura", "Novela"],
+    "Fiction / General": ["Literatura"],
+    "Fiction / Literary": ["Literatura", "Clásico"],
+    "Detective and mystery stories": ["Novela Negra", "Suspenso"],
+    "Fiction / Mystery & Detective / General": ["Novela Negra", "Suspenso"],
+    "Fiction / Fantasy / General": ["Fantasía"],
+    "Fiction / Science Fiction / General": ["Ciencia Ficción"],
+    "Fiction / Historical / General": ["Novela Histórica"],
+    "Fiction / Romance / General": ["Romance"],
+    "Poetry / General": ["Poesía"],
+    "Drama / General": ["Teatro"],
+    "Comics & Graphic Novels / General": ["Cómic", "Novela Gráfica"],
+    "Juvenile Fiction": ["Infantil", "Juvenil"],
+    "Children's stories": ["Infantil"],
+    "History / General": ["Historia"],
+    "Biography & Autobiography / General": ["Biografía"],
+    "Science / General": ["Ciencias Naturales"],
+    "Philosophy / General": ["Filosofía"],
+    "Psychology / General": ["Psicología"],
+    "Social Science / General": ["Ciencias Sociales"],
+    "Language Arts & Disciplines / General": ["Lengua y Literatura"],
+    "Mathematics / General": ["Matemática"],
+    "Computers / General": ["Tecnología", "Informática"],
+    "Education / General": ["Pedagogía"],
+    "Textbooks": ["Manual Escolar"],
+    "Dictionaries": ["Diccionario", "Referencia"],
+    "Art / General": ["Arte", "Música"],
+    "Sports & Recreation / General": ["Educación Física"],
+    "Cooking / General": ["Cocina"],
+  };
+
   const obtenerTagsAutomaticos = (categoriesFromGoogle: string[]): string[] => {
     if (!categoriesFromGoogle || categoriesFromGoogle.length === 0) return [];
-
-    const nuevosTags = new Set<string>(); // Usamos Set para evitar duplicados
-
+    const nuevosTags = new Set<string>(); 
     categoriesFromGoogle.forEach(categoryEnIngles => {
-      // Buscamos si tenemos la categoría exacta en nuestro diccionario
       const tagsTraducidos = traductorCategorias[categoryEnIngles];
-      
       if (tagsTraducidos) {
         tagsTraducidos.forEach(tag => nuevosTags.add(tag));
       } else {
-        // 2. Fallbacks más amplios (pasamos a minúscula para no errar)
         const catBaja = categoryEnIngles.toLowerCase();
         let fueTraducido = false;
-
         if (catBaja.includes("fiction")) { nuevosTags.add("Literatura"); fueTraducido = true; }
         if (catBaja.includes("history")) { nuevosTags.add("Historia"); fueTraducido = true; }
         if (catBaja.includes("science")) { nuevosTags.add("Ciencia"); fueTraducido = true; }
@@ -262,53 +264,31 @@ export default function NuevoLibroCatalogo() {
         if (catBaja.includes("mystery") || catBaja.includes("detective")) { nuevosTags.add("Misterio/Policial"); fueTraducido = true; }
         if (catBaja.includes("fantasy")) { nuevosTags.add("Fantasía"); fueTraducido = true; }
         if (catBaja.includes("philosophy")) { nuevosTags.add("Filosofía"); fueTraducido = true; }
-        
-        // 3. LA RED DE SEGURIDAD: Si no encajó en nada, lo agregamos en inglés
-        if (!fueTraducido) {
-          nuevosTags.add(categoryEnIngles); 
-        }
+        if (!fueTraducido) { nuevosTags.add(categoryEnIngles); }
       }
     });
-
-    return Array.from(nuevosTags); // Convertimos el Set de vuelta a Array
+    return Array.from(nuevosTags); 
   };
 
-  // --- Funciones para Ejemplares ---
-  const agregarEjemplar = () => setEjemplares([...ejemplares, { numeroInventario: "", observaciones: "" }]);
-  const removerEjemplar = (index: number) => setEjemplares(ejemplares.filter((_, i) => i !== index));
-  const actualizarEjemplar = (index: number, campo: string, valor: string) => {
-    const nuevos = [...ejemplares];
-    nuevos[index] = { ...nuevos[index], [campo]: valor };
-    setEjemplares(nuevos);
-  };
-
-  // Función para autocompletar el Cutter-Sanborn
   const autocompletarCutter = async (autorIngresado: string) => {
     if (!autorIngresado || autorIngresado.length < 2) return;
-    
     try {
       const res = await fetch(`http://localhost:5078/api/libros/cutter/${autorIngresado}`);
       if (res.ok) {
         const data = await res.json();
-        setCodigoCutter(data.cutter); // Rellenamos el input mágicamente
+        setCodigoCutter(data.cutter); 
       }
     } catch (error) {
       console.error("No se pudo calcular el Cutter automáticamente.");
     }
   };
 
-  // Función para invertir "Nombre Apellido" a "Apellido, Nombre"
   const invertirNombreComercial = (nombreComercial: string) => {
     if (!nombreComercial) return "";
     const partes = nombreComercial.trim().split(" ");
-    
-    // Si tiene una sola palabra (ej: "Homero"), lo devolvemos igual
     if (partes.length <= 1) return nombreComercial; 
-    
-    // Sacamos la última palabra asumiendo que es el apellido
     const apellido = partes.pop(); 
-    const nombres = partes.join(" "); // Juntamos todo lo demás
-    
+    const nombres = partes.join(" "); 
     return `${apellido}, ${nombres}`;
   };
 
@@ -317,50 +297,32 @@ export default function NuevoLibroCatalogo() {
       alert("Por favor, ingresá un ISBN válido (10 o 13 dígitos) para buscar.");
       return;
     }
-    
     setBuscandoIsbn(true);
-    // Limpiamos campos por las dudas
     setTitulo(""); setSubtitulo(""); setAutorPrincipal(""); setEditorial(""); setAnioPublicacion("");
 
     try {
       const res = await fetch(`http://localhost:5078/api/libros/lookup/isbn/${isbn}?proveedor=${proveedorDatos}`);
-      
       if (res.ok) {
         const data = await res.json();
-        
-        // Rellenamos el formulario con los datos limpios que armó C#
         setTitulo(data.titulo);
         setSubtitulo(data.subtitulo);
         setEditorial(data.editorial);
         setAnioPublicacion(data.anioPublicacion);
-
-        // Sinopsis y Páginas directas del DTO
         setReseniaSinopsis(data.reseniaSinopsis?.replace(/<[^>]+>/g, '') || "");
         setCantidadPaginas(data.cantidadPaginas ? data.cantidadPaginas.toString() : "");
 
-        // Portada
         const urlImagen = data.portadaUrl || "";
         const urlSegura = urlImagen.replace("http://", "https://");
         setPortadaUrl(urlSegura);
         setPortadaPreview(urlSegura);
 
-        // Tags Automáticos usando el array que nos mandó C#
         const categoriasGoogle = data.categorias || [];
         const tagsSugeridos = obtenerTagsAutomaticos(categoriasGoogle);
         setTags(prev => Array.from(new Set([...prev, ...tagsSugeridos])));
         
-        // Magia híbrida: Invertimos el nombre antes de ponerlo en pantalla
         const autorInvertido = invertirNombreComercial(data.autorPrincipal);
         setAutorPrincipal(autorInvertido);
-        
-        // Ahora sí, disparamos el cálculo del Cutter con el formato "Apellido, Nombre"
-        if (autorInvertido) {
-          autocompletarCutter(autorInvertido);
-        }
-        
-        // ¡Opa! Si se rellenó el autor, intentamos calcular el Cutter automáticamente
-        //if(data.autorPrincipal) autocompletarCutter(data.autorPrincipal);
-
+        if (autorInvertido) autocompletarCutter(autorInvertido);
       } else {
         const err = await res.json();
         alert(err.mensaje || "No se encontraron datos para este ISBN.");
@@ -372,63 +334,24 @@ export default function NuevoLibroCatalogo() {
     }
   };
 
-  const traductorCategorias: { [key: string]: string[] } = {
-  // Literatura General
-  "Fiction": ["Literatura", "Novela"],
-  "Fiction / General": ["Literatura"],
-  "Fiction / Literary": ["Literatura", "Clásico"],
-  
-  // Géneros Específicos
-  "Detective and mystery stories": ["Novela Negra", "Suspenso"],
-  "Fiction / Mystery & Detective / General": ["Novela Negra", "Suspenso"],
-  "Fiction / Fantasy / General": ["Fantasía"],
-  "Fiction / Science Fiction / General": ["Ciencia Ficción"],
-  "Fiction / Historical / General": ["Novela Histórica"],
-  "Fiction / Romance / General": ["Romance"],
-  "Poetry / General": ["Poesía"],
-  "Drama / General": ["Teatro"],
-  "Comics & Graphic Novels / General": ["Cómic", "Novela Gráfica"],
+  const agregarEjemplar = () => setEjemplares([...ejemplares, { numeroInventario: "", observaciones: "" }]);
+  const removerEjemplar = (index: number) => setEjemplares(ejemplares.filter((_, i) => i !== index));
+  const actualizarEjemplar = (index: number, campo: string, valor: string) => {
+    const nuevos = [...ejemplares];
+    nuevos[index] = { ...nuevos[index], [campo]: valor };
+    setEjemplares(nuevos);
+  };
 
-  // Juvenil e Infantil
-  "Juvenile Fiction": ["Infantil", "Juvenil"],
-  "Children's stories": ["Infantil"],
-  
-  // No Ficción / Escolar
-  "History / General": ["Historia"],
-  "Biography & Autobiography / General": ["Biografía"],
-  "Science / General": ["Ciencias Naturales"],
-  "Philosophy / General": ["Filosofía"],
-  "Psychology / General": ["Psicología"],
-  "Social Science / General": ["Ciencias Sociales"],
-  "Language Arts & Disciplines / General": ["Lengua y Literatura"],
-  "Mathematics / General": ["Matemática"],
-  "Computers / General": ["Tecnología", "Informática"],
-  "Education / General": ["Pedagogía"],
-  "Textbooks": ["Manual Escolar"],
-  "Dictionaries": ["Diccionario", "Referencia"],
-  
-  // Arte y otros
-  "Art / General": ["Arte", "Música"],
-  "Sports & Recreation / General": ["Educación Física"],
-  "Cooking / General": ["Cocina"],
-};
-
-  // --- Guardar en API ---
   const guardarLibro = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (ejemplares.some(ej => ej.numeroInventario.trim() === "")) {
       alert("Completá el Número de Inventario de todos los ejemplares.");
       return;
     }
 
     setCargando(true);
-
     try {
-      // 1. Creamos el empaquetador de formulario
       const formData = new FormData();
-
-      // 2. Agregamos los textos simples
       formData.append("titulo", titulo);
       formData.append("subtitulo", subtitulo);
       formData.append("autorPrincipal", autorPrincipal);
@@ -440,31 +363,18 @@ export default function NuevoLibroCatalogo() {
       formData.append("reseniaSinopsis", reseniaSinopsis);
       formData.append("portadaUrl", portadaUrl);
 
-      if (cantidadPaginas) {
-        formData.append("cantidadPaginas", cantidadPaginas.toString());
-      }
-
-      // 3. Agregamos la lógica de la imagen local (Asegurate de haber creado estos useState)
+      if (cantidadPaginas) formData.append("cantidadPaginas", cantidadPaginas.toString());
       formData.append("usarPortadaLocal", usarPortadaLocal.toString());
-      if (archivoPortada) {
-        formData.append("archivoPortada", archivoPortada); // Acá viaja el archivo físico
-      }
+      if (archivoPortada) formData.append("archivoPortada", archivoPortada);
 
-      // 4. Empaquetamos los Tags (A C# le gustan así: Tags[0], Tags[1]...)
-      tags.forEach((tag, index) => {
-        formData.append(`Tags[${index}]`, tag);
-      });
-
-      // 5. Empaquetamos los Ejemplares (A C# le gustan así: Ejemplares[0].NumeroInventario...)
+      tags.forEach((tag, index) => formData.append(`Tags[${index}]`, tag));
       ejemplares.forEach((ej, index) => {
         formData.append(`Ejemplares[${index}].NumeroInventario`, ej.numeroInventario);
         formData.append(`Ejemplares[${index}].Observaciones`, ej.observaciones);
       });
 
-      // 6. Hacemos el envío
       const res = await fetch("http://localhost:5078/api/libros", {
         method: "POST",
-        // ¡IMPORTANTE! Al usar FormData NO se pone el header "Content-Type".
         body: formData,
       });
 
@@ -483,79 +393,80 @@ export default function NuevoLibroCatalogo() {
     }
   };
 
+  // CLASES BASE PARA LOS INPUTS DEPENDIENDO DEL TEMA
+  const inputBaseClass = `w-full border p-2.5 rounded-lg outline-none transition font-medium ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-[var(--acento)]' : 'bg-gray-50 border-gray-300 focus:ring-2 focus:ring-[var(--acento)] text-gray-900'}`;
+  const labelBaseClass = `block text-sm font-medium mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-700'}`;
+
   return (
-    <main className="min-h-screen bg-gray-50  text-black">
-      <nav className="bg-slate-800 text-white p-4 mb-4 shadow-md print:hidden">
+    <main className={`min-h-screen transition-colors duration-700 ${claseTema} bg-[var(--bg-principal)] pb-12`}>
+      <nav className="p-4 mb-4 shadow-md bg-[var(--bg-header)] text-[var(--texto-header)] transition-colors print:hidden">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="text-2xl">📋</span>
             <h1 className="text-xl font-bold tracking-wider">INGRESAR LIBRO</h1>
           </div>
-          <Link href="/" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition">
+          <Link href="/" className="bg-[var(--acento)] hover:bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition flex items-center gap-2 shadow-sm ">
             Volver al Catálogo
           </Link>
         </div>
       </nav>
-      <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200 border-t-4 border-t-purple-600">
-        <h1 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">Ingresar Título al Catálogo</h1>
+
+      <div className={`max-w-4xl mx-auto p-8 rounded-2xl shadow-sm border border-t-4 transition-colors mb-12 ${config?.temaId === 'obsidian' ? 'bg-[var(--card-bg)] border-white/10 border-t-[var(--acento)]' : 'bg-white border-gray-200 border-t-[var(--acento)]'}`}>
+        <h1 className={`text-2xl font-bold mb-6 border-b pb-4 ${config?.temaId === 'obsidian' ? 'text-white border-white/10' : 'text-gray-800 border-gray-200'}`}>Ingresar Título al Catálogo</h1>
 
         <form onSubmit={guardarLibro} className="space-y-8">
           
           {/* SECCIÓN 1: DATOS BIBLIOGRÁFICOS */}
           <section>
-            <h2 className="text-lg font-semibold text-purple-800 mb-4 bg-purple-50 p-2 rounded">1. Ficha Bibliográfica</h2>
+            <h2 className={`text-lg font-semibold mb-4 p-2 rounded flex items-center gap-2 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 text-[var(--acento)]' : 'bg-gray-50 text-[var(--acento)] border border-gray-200'}`}>
+              1. Ficha Bibliográfica
+            </h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Título *</label>
+                <label className={labelBaseClass}>Título *</label>
                 <input 
                   type="text" 
                   required 
-                  className="w-full border-2 border-gray-300 p-3 rounded-lg focus:ring-0 focus:border-blue-500" 
+                  className={inputBaseClass} 
                   value={titulo} 
                   onChange={(e) => setTitulo(e.target.value)} 
                 />
-                {/* NUEVO BOTÓN: EL SCRAPER */}
-              {/* BOTÓN DEL SABUESO */}
-                {/* NUEVO SELECTOR DE BASES */}
                 
-                <div className="flex space-betwen pt-2 "><select 
-                  className="border-2 border-gray-300 p-3 rounded-lg font-bold text-gray-700 outline-none focus:border-orange-500"
-                  value={proveedorScraper}
-                  onChange={(e) => setProveedorScraper(e.target.value)}
-                >
-                  <option value="yenny">Yenny</option>
-                  {/* <option value="cuspide">Cúspide</option>                   */}
-                  {/* <option value="buscalibre">BuscaLibre</option> */ }
-                </select>
+                <div className="flex space-betwen pt-2">
+                  <select 
+                    className={`border p-2.5 rounded-lg font-bold outline-none transition ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-orange-500' : 'bg-gray-50 border-gray-300 text-gray-700 focus:border-orange-500'}`}
+                    value={proveedorScraper}
+                    onChange={(e) => setProveedorScraper(e.target.value)}
+                  >
+                    <option value="yenny">Yenny</option>
+                  </select>
 
-                <button 
-                  type="button" 
-                  onClick={buscarPorTituloScraper}
-                  className="bg-orange-500 hover:bg-orange-600 text-white px-4 rounded-lg font-bold transition shadow-sm flex items-center gap-2 whitespace-nowrap ml-2"
-                >
-                  🕵️‍♂️ Buscar
-                </button>
-                
-                
-                
-                <span className="text-xs text-amber-600  font-medium bg-amber-50 inline-block px-2 py-0.5 rounded border border-amber-200 ml-4">
-                  ⚠️ El mismo campo de titulo para buscar, puede usarse para buscar ingresando el nombre del autor
-                </span>
-                
+                  <button 
+                    type="button" 
+                    onClick={buscarPorTituloScraper}
+                    className="bg-[var(--acento)] hover:bg-[var(--acento)] hover:brightness-110 text-white px-4 rounded-lg font-bold transition shadow-sm flex items-center gap-2 whitespace-nowrap ml-2"
+                  >
+                    🕵️‍♂️ Buscar
+                  </button>
+                  
+                  <span className={`text-xs mt-1 font-medium inline-block px-2 py-0.5 rounded border ml-4 flex items-center ${config?.temaId === 'obsidian' ? 'bg-amber-900/30 text-white border-amber-700' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                    ⚠️ El mismo campo de titulo puede usarse para buscar ingresando el nombre del autor
+                  </span>
+                </div>
               </div>
-              </div>
+              
               <div className="col-span-2 md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subtítulo</label>
-                <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={subtitulo} onChange={(e) => setSubtitulo(e.target.value)} />
+                <label className={labelBaseClass}>Subtítulo</label>
+                <input type="text" className={`${inputBaseClass} ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-600'}`} value={subtitulo} onChange={(e) => setSubtitulo(e.target.value)} />
               </div>
               
               {/* --- CAMPO AUTOR CON AUTOCOMPLETADO --- */}
               <div className="col-span-2 md:col-span-1 relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Autor Principal *</label>
+                <label className={labelBaseClass}>Autor Principal *</label>
                 <input 
                   type="text" 
                   required 
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" 
+                  className={`w-full border p-2.5 rounded-lg outline-none font-bold transition ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-[var(--acento)]/30 text-white focus:border-[var(--acento)]' : 'bg-gray-50 border-gray-300 focus:ring-2 focus:ring-[var(--acento)] text-gray-900'}`} 
                   placeholder="Ej: Borges, Jorge Luis" 
                   value={autorPrincipal} 
                   onChange={(e) => manejarCambioAutor(e.target.value)} 
@@ -565,13 +476,12 @@ export default function NuevoLibroCatalogo() {
                   }} 
                 />
                 
-                {/* Cajita flotante de Autores */}
                 {mostrarSugerenciasAutor && sugerenciasAutor.length > 0 && (
-                  <ul className="absolute z-10 w-full bg-white border border-gray-200 mt-1 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                  <ul className={`absolute z-10 w-full mt-1 rounded-xl shadow-2xl max-h-48 overflow-y-auto border ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
                     {sugerenciasAutor.map((autor, i) => (
                       <li 
                         key={i} 
-                        className="p-3 hover:bg-purple-100 cursor-pointer text-sm font-medium text-gray-700 border-b last:border-0 transition" 
+                        className={`p-3 cursor-pointer text-sm font-medium border-b last:border-0 transition ${config?.temaId === 'obsidian' ? 'hover:bg-slate-700 text-slate-200 border-slate-700' : 'hover:bg-gray-100 text-gray-700 border-gray-100'}`} 
                         onClick={() => seleccionarAutor(autor)}
                       >
                         ✍️ {autor}
@@ -579,166 +489,165 @@ export default function NuevoLibroCatalogo() {
                     ))}
                   </ul>
                 )}
-
-                <p className="text-xs text-amber-600 mt-1 font-medium bg-amber-50 inline-block px-2 py-0.5 rounded border border-amber-200">
+                <p className={`text-[10px] mt-1 font-medium inline-block px-2 py-0.5 rounded border ${config?.temaId === 'obsidian' ? 'bg-amber-900/30 text-white border-amber-700' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
                   ⚠️ Ojo: Revisar autores con apellidos compuestos (ej: García Márquez).
                 </p>
               </div>
-           
 
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reseña / Sinopsis</label>
-              <textarea 
-                rows={5}
-                placeholder="Escriba o pegue la sinopsis del libro..."
-                className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none text-sm leading-relaxed" 
-                value={reseniaSinopsis} 
-                onChange={(e) => setReseniaSinopsis(e.target.value)} 
-              />
-            </div>
-          </div>
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Editorial</label>
-                <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={editorial} onChange={(e) => setEditorial(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Año Pub.</label>
-                  <input type="text" placeholder="Ej: 2010" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" value={anioPublicacion} onChange={(e) => setAnioPublicacion(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ISBN</label>
-                  <input 
-                    type="text" 
-                    placeholder="978..."
-                    className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none mb-2" 
-                    value={isbn} 
-                    onChange={(e) => setIsbn(e.target.value)} 
-                  />
-                  
-                      <select 
-                        className="border border-gray-300 p-2 rounded-lg bg-gray-50 text-sm font-medium outline-none focus:ring-2 focus:ring-purple-500 flex-1 mb-2 w-full"
-                        value={proveedorDatos}
-                        onChange={(e) => setProveedorDatos(e.target.value)}
-                      >
-                        <option value="todas">🚀 Todas </option>
-                        <option value="google">🔍 Solo Google Books</option>
-                        <option value="openlibrary">📚 Solo Open Library</option>
-                      </select>
-                  <button 
-                    type="button" 
-                    onClick={buscarDatosPorIsbn}
-                    disabled={buscandoIsbn}
-                    className={`w-full justify-center px-3 py-2 rounded-lg border transition flex items-center gap-2 text-sm font-bold ${buscandoIsbn ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200'}`}
-                    title="Buscar datos automáticamente"
-                  >
-                    {buscandoIsbn ? '⏳ Buscando...' : '✨ Autocompletar desde Internet'}
-                  </button>
-                  
-                </div>
-              </div>
-            
-          </section>
-
-          <section>
-               {/* 5. DISEÑO DE UI: MOSTRAR LA PORTADA Y LOS NUEVOS DATOS */}
-        <div className="grid grid-cols-4 gap-6 mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl shadow-inner">
-          
-          {/* COLUMNA 1: PREVIEW DE LA TAPA */}
-          <div className="col-span-1 flex flex-col items-center">
-            <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Portada</h4>
-            <div className="w-full h-56 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden shadow-sm">
-              {portadaPreview ? (
-                <img src={portadaPreview} alt="Tapa del libro" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-5xl text-gray-300">🖼️</span>
-              )}
-            </div>
-          </div>
-
-          {/* COLUMNA 2, 3 y 4: DATOS EXPANSIBLES */}
-          <div className="col-span-3 space-y-4">
-            <div className="grid grid-cols-4 gap-4">
-              <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nº Páginas</label>
-                <input 
-                  type="number" 
-                  placeholder="Ej: 350"
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none font-medium" 
-                  value={cantidadPaginas} 
-                  onChange={(e) => setCantidadPaginas(e.target.value)} 
+              <div className="col-span-2">
+                <label className={labelBaseClass}>Reseña / Sinopsis</label>
+                <textarea 
+                  rows={5}
+                  placeholder="Escriba o pegue la sinopsis del libro..."
+                  className={`${inputBaseClass} text-sm leading-relaxed`} 
+                  value={reseniaSinopsis} 
+                  onChange={(e) => setReseniaSinopsis(e.target.value)} 
                 />
               </div>
-              <div className="col-span-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">URL de Portada</label>
+            </div>
+            
+            <div className="mt-4">
+              <label className={labelBaseClass}>Editorial</label>
+              <input type="text" className={inputBaseClass} value={editorial} onChange={(e) => setEditorial(e.target.value)} />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <div>
+                <label className={labelBaseClass}>Año Pub.</label>
+                <input type="text" placeholder="Ej: 2010" className={inputBaseClass} value={anioPublicacion} onChange={(e) => setAnioPublicacion(e.target.value)} />
+              </div>
+              <div>
+                <label className={labelBaseClass}>ISBN</label>
                 <input 
                   type="text" 
-                  placeholder="Se completa automáticamente"
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none text-xs font-mono text-gray-600 bg-gray-50 mb-4" 
-                  value={portadaUrl} 
-                  onChange={(e) => {
-                    setPortadaUrl(e.target.value);
-                    setPortadaPreview(e.target.value);
-                  }} 
+                  placeholder="978..."
+                  className={`${inputBaseClass} mb-2`} 
+                  value={isbn} 
+                  onChange={(e) => setIsbn(e.target.value)} 
                 />
-                {/* Opciones Locales (NUEVO) */}
-    <div className="border border-purple-200 p-4 rounded-lg bg-purple-50">
-      <h4 className="text-sm font-bold text-purple-900 mb-2">💾 Opciones Locales (Autonomía)</h4>
-      <div className="flex items-center gap-6">
-        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
-          <input 
-            type="checkbox" 
-            checked={usarPortadaLocal} 
-            onChange={(e) => setUsarPortadaLocal(e.target.checked)} 
-          />
-          Usar Portada Local (A prueba de cortes de internet)
-        </label>
-        
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Subir imagen a mano</label>
-          <input 
-            type="file" 
-            accept="image/*"
-            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                setArchivoPortada(e.target.files[0]);
-                setUsarPortadaLocal(true); 
-              }
-            }}
-          />
-        </div>
-      </div>
-    </div>
+                
+                <select 
+                  className={`w-full border p-2.5 rounded-lg text-sm font-medium outline-none transition flex-1 mb-2 ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-[var(--acento)]' : 'bg-gray-50 border-gray-300 text-gray-900 focus:ring-2 focus:ring-[var(--acento)]'}`}
+                  value={proveedorDatos}
+                  onChange={(e) => setProveedorDatos(e.target.value)}
+                >
+                  <option value="todas">🚀 Todas </option>
+                  <option value="google">🔍 Solo Google Books</option>
+                  <option value="openlibrary">📚 Solo Open Library</option>
+                </select>
+                <button 
+                  type="button" 
+                  onClick={buscarDatosPorIsbn}
+                  disabled={buscandoIsbn}
+                  className={`w-full justify-center px-3 py-2 rounded-lg border transition flex items-center gap-2 text-sm font-bold ${buscandoIsbn ? (config?.temaId === 'obsidian' ? 'bg-slate-800 text-slate-500 border-slate-700' : 'bg-gray-100 text-gray-400 border-gray-200') : (config?.temaId === 'obsidian' ? 'bg-[var(--acento)]/20 text-[var(--acento)] border-[var(--acento)]/40 hover:bg-[var(--acento)]/30' : 'bg-gray-100 text-[var(--acento)] border-gray-200 hover:bg-gray-200')}`}
+                  title="Buscar datos automáticamente"
+                >
+                  {buscandoIsbn ? '⏳ Buscando...' : '✨ Autocompletar desde Internet'}
+                </button>
               </div>
-            </div>
-            </div>
             </div>
           </section>
 
-          {/* NUEVA SECCIÓN: ETIQUETAS (TAGS) CON TESAURO */}
           <section>
-            <h2 className="text-lg font-semibold text-purple-800 mb-4 bg-purple-50 p-2 rounded">2. Etiquetas y Materias</h2>
-            <div className="border border-gray-300 p-4 rounded-lg bg-gray-50">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Agregar Tags (Escribí el tema y apretá <kbd className="bg-gray-200 px-1 rounded">Enter</kbd> o coma)
+            <div className={`grid grid-cols-4 gap-6 mt-8 p-6 border rounded-2xl shadow-inner ${config?.temaId === 'obsidian' ? 'bg-slate-800/40 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+              
+              <div className="col-span-1 flex flex-col items-center">
+                <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${config?.temaId === 'obsidian' ? 'text-slate-500' : 'text-gray-400'}`}>Portada</h4>
+                <div className={`w-full h-56 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden shadow-sm ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-300'}`}>
+                  {portadaPreview ? (
+                    <img src={portadaPreview} alt="Tapa del libro" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className={`text-5xl ${config?.temaId === 'obsidian' ? 'opacity-30' : 'text-gray-300'}`}>🖼️</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="col-span-3 space-y-4">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="col-span-1">
+                    <label className={labelBaseClass}>Nº Páginas</label>
+                    <input 
+                      type="number" 
+                      placeholder="Ej: 350"
+                      className={inputBaseClass} 
+                      value={cantidadPaginas} 
+                      onChange={(e) => setCantidadPaginas(e.target.value)} 
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <label className={labelBaseClass}>URL de Portada</label>
+                    <input 
+                      type="text" 
+                      placeholder="Se completa automáticamente"
+                      className={`w-full border p-2.5 rounded-lg outline-none text-xs font-mono mb-4 transition ${config?.temaId === 'obsidian' ? 'bg-slate-900 border-slate-700 text-slate-400 focus:border-[var(--acento)]' : 'bg-gray-100 border-gray-200 text-gray-600 focus:ring-2 focus:ring-[var(--acento)]'}`} 
+                      value={portadaUrl} 
+                      onChange={(e) => {
+                        setPortadaUrl(e.target.value);
+                        setPortadaPreview(e.target.value);
+                      }} 
+                    />
+                    
+                    <div className={`border p-4 rounded-lg shadow-inner mb-3 ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 border-[var(--acento)]/30' : 'bg-white border-[var(--acento)]/30'}`}>
+                      <h4 className={`text-sm font-bold mb-2 flex items-center gap-1 ${config?.temaId === 'obsidian' ? 'text-[var(--acento)]' : 'text-[var(--acento)]'}`}><span>💾</span> Opciones Locales (Autonomía)</h4>
+                      <div className="flex items-center gap-6">
+                        <label className={`flex items-center gap-2 cursor-pointer text-sm font-medium p-2 rounded-lg border transition ${config?.temaId === 'obsidian' ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700' : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200'}`}>
+                          <input 
+                            type="checkbox" 
+                            checked={usarPortadaLocal} 
+                            onChange={(e) => setUsarPortadaLocal(e.target.checked)} 
+                            className={`w-5 h-5 rounded ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-600 text-[var(--acento)] focus:ring-[var(--acento)]' : 'text-[var(--acento)] focus:ring-[var(--acento)] border-gray-300'}`}
+                          />
+                          Usar Portada Local (A prueba de cortes)
+                        </label>
+                        
+                        <div>
+                          <label className={`block text-xs font-bold uppercase tracking-wide mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Subir imagen a mano</label>
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            className={`w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:cursor-pointer ${config?.temaId === 'obsidian' ? 'text-slate-400 file:bg-slate-800 file:text-[var(--acento)] hover:file:bg-slate-700' : 'text-gray-500 file:bg-gray-100 file:text-[var(--acento)] hover:file:bg-gray-200'}`}
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setArchivoPortada(e.target.files[0]);
+                                setUsarPortadaLocal(true); 
+                                setPortadaPreview(URL.createObjectURL(e.target.files[0]));
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* NUEVA SECCIÓN: ETIQUETAS */}
+          <section>
+            <h2 className={`text-lg font-semibold mb-4 p-2 rounded flex items-center gap-2 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 text-[var(--acento)]' : 'bg-gray-50 text-[var(--acento)] border border-gray-200'}`}>
+              2. Etiquetas y Materias
+            </h2>
+            <div className={`border p-4 rounded-lg ${config?.temaId === 'obsidian' ? 'bg-slate-800/40 border-white/5' : 'bg-gray-50 border-gray-300'}`}>
+              <label className={`block text-sm font-bold mb-3 ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-700'}`}>
+                Agregar Tags (Escribí el tema y apretá <kbd className={`px-1.5 py-0.5 rounded border font-sans text-xs ${config?.temaId === 'obsidian' ? 'bg-slate-700 border-slate-600' : 'bg-gray-200 border-gray-300'}`}>Enter</kbd> o coma)
               </label>
               {tags.length > 0 && (
-                  <button 
-                    type="button" 
-                    onClick={() => setTags([])} 
-                    className="text-xs text-red-600 hover:text-red-800 font-bold bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-200 transition flex items-center gap-1 shadow-sm mb-3"
-                    title="Borrar todas las etiquetas"
-                  >
-                    🗑️ Limpiar todo ({tags.length})
-                  </button>
-                )}
+                <button 
+                  type="button" 
+                  onClick={() => setTags([])} 
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition flex items-center gap-1 shadow-sm mb-3 ${config?.temaId === 'obsidian' ? 'bg-red-900/20 text-red-400 border-red-500/30 hover:bg-red-900/40' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:text-red-800'}`}
+                  title="Borrar todas las etiquetas"
+                >
+                  🗑️ Limpiar todo ({tags.length})
+                </button>
+              )}
               
               <div className="flex flex-wrap gap-2 mb-3">
                 {tags.map((tag, index) => (
-                  <span key={index} className="bg-purple-600 text-white text-sm font-medium px-3 py-1 rounded-full flex items-center gap-2 shadow-sm">
+                  <span key={index} className="bg-[var(--acento)] text-[var(--acento-texto)] text-sm font-bold px-3 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
                     {tag}
-                    <button type="button" onClick={() => removerTag(tag)} className="hover:text-red-300 font-bold">×</button>
+                    <button type="button" onClick={() => removerTag(tag)} className="opacity-70 hover:opacity-100 font-bold transition text-lg leading-none">×</button>
                   </span>
                 ))}
               </div>
@@ -748,20 +657,19 @@ export default function NuevoLibroCatalogo() {
                 <input 
                   type="text" 
                   placeholder="Buscar en el Tesauro (Ej: Educación, Ficción...)" 
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none" 
+                  className={inputBaseClass} 
                   value={tagInput} 
                   onChange={(e) => manejarCambioTag(e.target.value)}
                   onKeyDown={manejarInputTag}
                   onBlur={() => setTimeout(() => setMostrarSugerenciasTags(false), 200)}
                 />
 
-                {/* Cajita flotante del Tesauro */}
                 {mostrarSugerenciasTags && sugerenciasTags.length > 0 && (
-                  <ul className="absolute z-10 w-full bg-white border border-purple-200 mt-1 rounded-xl shadow-2xl max-h-56 overflow-y-auto">
+                  <ul className={`absolute z-10 w-full mt-1 rounded-xl shadow-2xl max-h-56 overflow-y-auto border ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
                     {sugerenciasTags.map((tag, i) => (
                       <li 
                         key={i} 
-                        className="p-3 hover:bg-purple-100 cursor-pointer text-sm font-bold text-purple-900 border-b border-purple-50 last:border-0 transition flex items-center gap-2" 
+                        className={`p-3 cursor-pointer text-sm font-bold border-b last:border-0 transition flex items-center gap-2 ${config?.temaId === 'obsidian' ? 'hover:bg-slate-700 text-[var(--acento)] border-slate-700' : 'hover:bg-gray-100 text-gray-700 border-gray-100'}`} 
                         onClick={() => seleccionarTag(tag)}
                       >
                         🏷️ {tag}
@@ -770,27 +678,28 @@ export default function NuevoLibroCatalogo() {
                   </ul>
                 )}
               </div>
-
             </div>
           </section>
 
           {/* SECCIÓN SIGNATURA TOPOGRÁFICA */}
           <section>
-            <h2 className="text-lg font-semibold text-purple-800 mb-4 bg-purple-50 p-2 rounded">3. Ubicación en Estante</h2>
+            <h2 className={`text-lg font-semibold mb-4 p-2 rounded flex items-center gap-2 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 text-[var(--acento)]' : 'bg-gray-50 text-[var(--acento)] border border-gray-200'}`}>
+              3. Ubicación en Estante
+            </h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Clasificación (Ej: 863)</label>
-                <input type="text" className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none font-mono" value={clasificacion} onChange={(e) => setClasificacion(e.target.value)} />
+                <label className={labelBaseClass}>Clasificación (Ej: 863)</label>
+                <input type="text" className={`${inputBaseClass} font-mono`} value={clasificacion} onChange={(e) => setClasificacion(e.target.value)} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cutter-Sanborn (Ej: B732)</label>
+                <label className={labelBaseClass}>Cutter-Sanborn (Ej: B732)</label>
                 <input 
                   type="text" 
-                  className="w-full border p-2 rounded font-mono focus:ring-2 focus:ring-purple-500" 
+                  className={`${inputBaseClass} font-mono`} 
                   value={codigoCutter} 
                   onChange={(e) => setCodigoCutter(e.target.value)} 
                 />
-                <p className="text-xs text-amber-600 mt-1 font-medium bg-amber-50 inline-block px-2 py-0.5 rounded border border-amber-200 shadow-sm">
+                <p className={`text-[10px] mt-1 font-medium inline-block px-2 py-0.5 rounded border shadow-sm ${config?.temaId === 'obsidian' ? 'bg-amber-900/30 text-white border-amber-700' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
                   ⚠️ Ojo: Revisar si el autor tenía apellido compuesto.
                 </p>
               </div>
@@ -799,34 +708,36 @@ export default function NuevoLibroCatalogo() {
 
           {/* SECCIÓN EJEMPLARES FÍSICOS */}
           <section>
-            <div className="flex justify-between items-center mb-4 bg-gray-100 p-2 rounded border border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">4. Ejemplares Físicos (Inventario)</h2>
-              <button type="button" onClick={agregarEjemplar} className="text-sm bg-purple-200 text-purple-800 hover:bg-purple-300 px-3 py-1 rounded font-bold transition">
+            <div className={`flex justify-between items-center mb-4 p-2 rounded border ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 border-white/10' : 'bg-gray-100 border-gray-200'}`}>
+              <h2 className={`text-lg font-semibold flex items-center gap-2 ${config?.temaId === 'obsidian' ? 'text-[var(--acento)]' : 'text-gray-800'}`}>
+                4. Ejemplares Físicos (Inventario)
+              </h2>
+              <button type="button" onClick={agregarEjemplar} className="text-sm bg-[var(--acento)] text-white hover:bg-[var(--acento)] hover:brightness-110 px-3 py-1 rounded font-bold transition shadow-sm">
                 + Agregar Copia
               </button>
             </div>
             
             <div className="space-y-3">
               {ejemplares.map((ej, index) => (
-                <div key={index} className="flex gap-3 items-start bg-white p-3 border border-gray-300 rounded-lg shadow-sm">
+                <div key={index} className={`flex gap-3 items-start p-3 border rounded-lg shadow-sm transition ${config?.temaId === 'obsidian' ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-300'}`}>
                   <div className="w-1/3">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Nº Inventario *</label>
+                    <label className={`block text-xs font-bold uppercase tracking-wide mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Nº Inventario *</label>
                     <input 
                       type="text" required placeholder="Ej: 00452"
-                      className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none font-mono font-bold text-purple-900 bg-purple-50"
+                      className={`w-full border p-2 rounded outline-none font-mono font-bold text-lg focus:ring-2 focus:ring-[var(--acento)] ${config?.temaId === 'obsidian' ? 'bg-slate-900 border-slate-700 text-[var(--acento)]' : 'bg-gray-50 border-gray-300 text-[var(--acento)]'}`}
                       value={ej.numeroInventario} onChange={(e) => actualizarEjemplar(index, 'numeroInventario', e.target.value)} 
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Observaciones</label>
+                    <label className={`block text-xs font-bold uppercase tracking-wide mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Observaciones</label>
                     <input 
                       type="text" placeholder="Ej: Faltan hojas..."
-                      className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none"
+                      className={inputBaseClass}
                       value={ej.observaciones} onChange={(e) => actualizarEjemplar(index, 'observaciones', e.target.value)} 
                     />
                   </div>
                   {ejemplares.length > 1 && (
-                    <button type="button" onClick={() => removerEjemplar(index)} className="mt-6 text-red-500 hover:bg-red-50 px-3 py-2 rounded transition">✕</button>
+                    <button type="button" onClick={() => removerEjemplar(index)} className={`mt-6 px-3 py-2 rounded transition font-bold ${config?.temaId === 'obsidian' ? 'text-red-400 hover:bg-red-500/20' : 'text-red-500 hover:bg-red-50'}`}>✕</button>
                   )}
                 </div>
               ))}
@@ -834,21 +745,20 @@ export default function NuevoLibroCatalogo() {
           </section>
 
           {/* BOTONES */}
-          <div className="flex justify-end gap-3 pt-6 border-t mt-8">
-            <button type="submit" disabled={cargando} className={`px-8 py-3 rounded-xl font-bold text-white transition shadow-lg ${cargando ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'}`}>
-              {cargando ? 'Guardando...' : 'Guardar Ficha'}
+          <div className={`flex justify-end gap-3 pt-6 border-t mt-8 ${config?.temaId === 'obsidian' ? 'border-white/10' : 'border-gray-100'}`}>
+            <button type="submit" disabled={cargando} className={`px-8 py-3 rounded-xl font-bold transition shadow-lg flex items-center gap-2 ${cargando ? 'bg-[var(--acento)]/50 cursor-wait text-white' : 'bg-[var(--acento)] hover:brightness-110 text-white'}`}>
+              {cargando ? '⌛ Guardando...' : '💾 Guardar Ficha'}
             </button>
           </div>
         </form>
       </div>
-
 
       {/* ========================================== */}
       {/* MODAL DEL SCRAPER (VENTANA FLOTANTE)         */}
       {/* ========================================== */}
       {modalScraperAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] border-2 border-orange-500">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] border-2 border-orange-500 ${config?.temaId === 'obsidian' ? 'bg-slate-900' : 'bg-white'}`}>
             
             {/* Cabecera del Modal */}
             <div className="bg-orange-500 text-white p-4 flex justify-between items-center shadow-md z-10">
@@ -866,23 +776,23 @@ export default function NuevoLibroCatalogo() {
             </div>
 
             {/* Cuerpo del Modal (Lista de Libros) */}
-            <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+            <div className={`p-6 overflow-y-auto flex-1 ${config?.temaId === 'obsidian' ? 'bg-slate-900' : 'bg-gray-50'}`}>
               {buscandoScraper ? (
-                <div className="text-center py-16 text-orange-600 font-bold animate-pulse text-xl flex flex-col items-center gap-4">
+                <div className="text-center py-16 text-orange-500 font-bold animate-pulse text-xl flex flex-col items-center gap-4">
                   <span className="text-5xl animate-spin">⏳</span>
                   Rastreando catálogos en la web...
                 </div>
               ) : resultadosScraper.length === 0 ? (
-                <div className="text-center py-16 text-gray-500 font-medium text-lg">
+                <div className={`text-center py-16 font-medium text-lg ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>
                   No se encontraron libros con ese título. <br/>Intentá escribir una palabra clave más corta (Ej: "Matematica" en vez de "Libro de Matematica 3").
                 </div>
               ) : (
                 <div className="grid gap-4">
                   {resultadosScraper.map((libro, idx) => (
-                    <div key={idx} className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-lg hover:border-orange-300 transition items-center">
+                    <div key={idx} className={`border rounded-xl p-4 flex gap-4 hover:shadow-lg hover:border-orange-300 transition items-center ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
                       
                       {/* Portada */}
-                      <div className="w-16 h-24 bg-gray-100 rounded-lg shadow-sm flex-shrink-0 overflow-hidden border border-gray-200">
+                      <div className={`w-16 h-24 rounded-lg shadow-sm flex-shrink-0 overflow-hidden border ${config?.temaId === 'obsidian' ? 'bg-slate-900 border-slate-600' : 'bg-gray-100 border-gray-200'}`}>
                         {libro.portadaUrl ? (
                           <img src={libro.portadaUrl} alt="Portada" className="w-full h-full object-cover" />
                         ) : (
@@ -892,9 +802,9 @@ export default function NuevoLibroCatalogo() {
                       
                       {/* Datos */}
                       <div className="flex-1">
-                        <h4 className="font-bold text-gray-800 text-lg leading-tight mb-1">{libro.titulo}</h4>
-                        <p className="text-sm text-blue-800 font-bold">{libro.autor}</p>
-                        <p className="text-xs text-gray-500 mt-2 italic bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">
+                        <h4 className={`font-bold text-lg leading-tight mb-1 ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-800'}`}>{libro.titulo}</h4>
+                        <p className={`text-sm font-bold ${config?.temaId === 'obsidian' ? 'text-blue-400' : 'text-blue-800'}`}>{libro.autor}</p>
+                        <p className={`text-xs mt-2 italic inline-block px-2 py-1 rounded border ${config?.temaId === 'obsidian' ? 'bg-slate-700/50 border-slate-600 text-slate-300' : 'bg-gray-50 border-gray-100 text-gray-500'}`}>
                           {libro.resumen}
                         </p>
                       </div>

@@ -20,7 +20,37 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  /* background: var(--bg-principal); */
+  /* color: var(--foreground); */
   font-family: Arial, Helvetica, sans-serif;
+  color: var(--bg-principal);
+  transition: background-color 0.7s ease;
+}
+/* TEMA OXFORD - Académico */
+/* 1. TEMA LUMINA - Minimalista y súper limpio (Reemplaza Oxford) */
+.tema-lumina {
+  --bg-principal: #f9fafb; /* Gris ultra claro (Tailwind gray-50) */
+  --bg-header: #ffffff;    /* Blanco puro */
+  --acento: #2563eb;       /* Azul Rey profesional (Tailwind blue-600) */
+  --texto-header: #111827; /* Gris casi negro para que resalte en el fondo blanco */
+  --card-bg: #ffffff;
+}
+
+/* 2. TEMA SEPIA - Descanso visual / E-reader (Reemplaza Botánico) */
+.tema-sepia {
+  --bg-principal: #fdfaf6; /* Color crema/papel */
+  --bg-header: #f3ede4;    /* Crema un poco más oscuro para separar el nav */
+  --acento: #c2410c;       /* Terracota elegante (Tailwind orange-700) */
+  --texto-header: #431407; /* Marrón muy oscuro */
+  --card-bg: #ffffff;
+}
+
+/* 3. TEMA OBSIDIAN - Dark Mode Tecnológico (Ajustado) */
+.tema-obsidian {
+  --bg-principal: #0f172a; /* Slate 900 (Azul marino muy oscuro, mejor que negro puro) */
+  --bg-header: #020617;    /* Slate 950 (Para el header, da profundidad) */
+  --acento: #0a6272;       /* Cian 500 (Brillante pero no lastima la vista) */
+  --texto-header: #ffffff; /* Blanco puro para el nombre de la biblioteca, como pediste */
+  --card-bg: #1e293b;      /* Slate 800 (Hace que las tarjetas resalten sutilmente) */
+  --texto-base: #cbd5e1;   /* Slate 300 (Para textos secundarios, no blanco puro) */
 }

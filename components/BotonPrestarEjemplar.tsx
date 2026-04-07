@@ -67,8 +67,8 @@ export default function BotonPrestarEjemplar({ ejemplarId, numeroInventario, tit
       {/* El botón que se ve en la tabla */}
       <button 
         onClick={() => setAbierto(true)}
-        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-medium transition shadow-sm"
-      >
+        className="bg-[var(--acento)] text-white hover:brightness-110 px-5 py-2 rounded-lg text-sm font-bold shadow-md transition disabled:opacity-50"
+    >
         Prestar
       </button>
 
@@ -129,8 +129,8 @@ export default function BotonPrestarEjemplar({ ejemplarId, numeroInventario, tit
                   setAbierto(false);
                   setError(""); // Limpiamos errores si cancela
                 }} 
-                className="px-4 py-2 text-gray-500 hover:bg-gray-100 font-medium rounded transition"
-              >
+                className="bg-[var(--acento)] text-[var(--acento-texto)] hover:brightness-110 px-5 py-2 rounded-lg text-sm font-bold shadow-md transition disabled:opacity-50"
+    >
                 Cancelar
               </button>
               <button 
