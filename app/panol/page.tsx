@@ -36,7 +36,7 @@ export default async function InventarioPanol() {
             <span className="text-2xl">🔌</span>
             <h1 className="text-xl font-bold tracking-wider">PAÑOL TECNOLÓGICO</h1>
           </div>
-          <Link href="/" className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition border border-[var(--acento)] shadow-sm">
+          <Link href="/admin" className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition border border-[var(--acento)] shadow-sm">
             Volver al Menú Principal
           </Link>
         </div>

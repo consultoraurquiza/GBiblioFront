@@ -40,7 +40,7 @@ export default async function InventarioGeneral() {
             <span className="text-2xl">📋</span>
             <h1 className="text-xl font-bold tracking-wider text-[var(--texto-header)]">INVENTARIO</h1>
           </div>
-          <Link href="/" className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition flex items-center gap-2 shadow-sm border border-[var(--acento)] print:hidden">
+          <Link href="/admin" className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition flex items-center gap-2 shadow-sm border border-[var(--acento)] print:hidden">
             Volver al Catálogo
           </Link>
         </div>

@@ -19,7 +19,7 @@ export default function SideBar({ seccionActiva, setSeccionActiva }: any) {
           setIsOpen(true);
           
         }}
-        className="fixed top-4 left-4 z-[70] bg-slate-800/80 backdrop-blur-md text-white w-12 h-12 rounded-full shadow-lg hover:bg-purple-600 transition-all flex items-center justify-center text-2xl"
+        className="fixed top-4 left-4 z-[70] bg-slate-800/80 backdrop-blur-md text-white w-12 h-12 rounded-full shadow-lg hover:bg-purple-600 transition-all flex items-center justify-center text-2xl mt-16"
       >
         ⚙️
       </button>

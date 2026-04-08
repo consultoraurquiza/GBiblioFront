@@ -380,7 +380,7 @@ export default function NuevoLibroCatalogo() {
 
       if (res.ok) {
         alert("¡Catálogo e inventario actualizados!");
-        router.push("/"); 
+        router.push("/admin"); 
       } else {
         const errorData = await res.json();
         alert("Error al guardar: " + (errorData.mensaje || "Revisá los datos."));
@@ -405,7 +405,7 @@ export default function NuevoLibroCatalogo() {
             <span className="text-2xl">📋</span>
             <h1 className="text-xl font-bold tracking-wider">INGRESAR LIBRO</h1>
           </div>
-          <Link href="/" className="bg-[var(--acento)] hover:bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition flex items-center gap-2 shadow-sm ">
+          <Link href="/admin" className="bg-[var(--acento)] hover:bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition flex items-center gap-2 shadow-sm ">
             Volver al Catálogo
           </Link>
         </div>

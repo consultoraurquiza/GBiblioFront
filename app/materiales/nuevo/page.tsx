@@ -37,7 +37,7 @@ export default function NuevoMaterialPanol() {
 
     setCargando(true);
     const payload = {
-      nombre, marca, modelo, numeroSerie, ubicacionFisica, cantidadTotal: cantidad, habilitado: true
+      nombre, marca, modelo, numeroSerie, ubicacionFisica, cantidadTotal: cantidad,cantidadDisponible: cantidad, habilitado: true
     };
 
     try {
@@ -184,7 +184,7 @@ export default function NuevoMaterialPanol() {
             <button 
               type="submit" 
               disabled={cargando} 
-              className={`px-10 py-3 rounded-xl font-bold transition shadow-lg text-lg order-1 md:order-2 flex items-center gap-2 justify-center  ${cargando ? 'bg-[var(--acento)]/50 cursor-wait text-[var(--acento-texto)]' : 'bg-[var(--acento)] hover:bg-[var(--acento-hover)] text-white'}`}
+              className={`px-10 py-3 rounded-xl font-bold transition shadow-lg text-lg order-1 md:order-2 flex items-center gap-2 justify-center  ${cargando ? 'bg-[var(--acento)]/50 cursor-wait text-[var(--acento-texto)]' : 'bg-[var(--acento)] hover:brightness-110 text-white'}`}
             >
               {cargando ? '⏳ Guardando...' : '💾 Guardar Material'}
             </button>

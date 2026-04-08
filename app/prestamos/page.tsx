@@ -48,7 +48,7 @@ export default function HistorialPrestamos() {
             <span className="text-2xl">📖</span>
             <h1 className="text-xl font-bold tracking-wider">MOSTRADOR DE CIRCULACIÓN</h1>
           </div>
-          <Link href="/" className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition border border-[var(--acento)] shadow-sm">
+          <Link href="/admin" className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition border border-[var(--acento)] shadow-sm">
             Volver al Catálogo
           </Link>
         </div>

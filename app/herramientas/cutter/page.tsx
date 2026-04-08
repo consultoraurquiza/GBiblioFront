@@ -25,7 +25,7 @@ export default async function VisualizadorCutter() {
             <span className="text-2xl">📏</span>
             <h1 className="text-xl font-bold tracking-wider">TABLA CUTTER</h1>
           </div>
-          <Link href="/" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition">
+          <Link href="/admin" className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition">
             Volver al Catálogo
           </Link>
         </div>
