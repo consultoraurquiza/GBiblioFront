@@ -6,6 +6,7 @@ export default function SeccionDatos() {
   const [config, setConfig] = useState<any>(null);
   const [descargando, setDescargando] = useState(false);
   const [restaurando, setRestaurando] = useState(false);
+  const [importando, setImportando] = useState(false);
 
   // CONFIGURACIÓN Y TEMA
   const claseTema = config ? `tema-${config.temaId}` : 'tema-lumina';
@@ -92,6 +93,37 @@ export default function SeccionDatos() {
     }
   };
 
+  const importarKoha = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportando(true);
+    const formData = new FormData();
+    formData.append("archivoXml", file);
+
+    try {
+      // Como le cambiaste el nombre al controller, la ruta ahora es /api/importacion/...
+      const res = await fetch("http://localhost:5078/api/importacion/importar-koha", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert("✅ " + data.mensaje);
+      } else {
+        const errorData = await res.json();
+        alert("Error al importar: " + (errorData.mensaje || "Archivo inválido."));
+      }
+    } catch (error) {
+      console.error("Error al importar:", error);
+      alert("No se pudo conectar con el servidor para la importación.");
+    } finally {
+      setImportando(false);
+      e.target.value = ''; // Limpiamos el input para poder subir el mismo archivo si hace falta
+    }
+  };
+
   return (
     <div className={`p-10 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 transition-colors ${claseTema}`}>
       <h2 className={`text-3xl font-black mb-2 ${config?.temaId === 'obsidian' ? 'text-white' : 'text-slate-800'}`}>
@@ -114,12 +146,18 @@ export default function SeccionDatos() {
               Migrar desde Koha
             </h4>
             <p className={`text-xs leading-relaxed mt-2 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-slate-500'}`}>
-              Subí tu archivo CSV exportado de Koha para poblar el inventario automáticamente.
+              Subí tu archivo MARCXML exportado de Koha para poblar el inventario automáticamente.
             </p>
           </div>
-          <label className={`cursor-pointer text-center py-3 rounded-xl font-bold text-sm active:scale-95 transition-all ${config?.temaId === 'obsidian' ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
-            Subir CSV
-            <input type="file" className="hidden" accept=".csv" />
+          <label className={`cursor-pointer text-center py-3 rounded-xl font-bold text-sm active:scale-95 transition-all ${importando ? 'bg-slate-400 cursor-wait text-slate-800' : config?.temaId === 'obsidian' ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
+            {importando ? '⏳ Importando libros...' : 'Subir archivo XML'}
+            <input 
+              type="file" 
+              className="hidden" 
+              accept=".xml" 
+              onChange={importarKoha}
+              disabled={importando}
+            />
           </label>
         </div>
 
