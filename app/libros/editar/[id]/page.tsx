@@ -21,6 +21,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
 
   const [buscandoIsbn, setBuscandoIsbn] = useState(false);
   const [proveedorDatos, setProveedorDatos] = useState("todas");
+  const [proveedorScraper, setProveedorScraper] = useState("yenny");
 
   // NUEVOS ESTADOS EXPANSIBLES
   const [reseniaSinopsis, setReseniaSinopsis] = useState("");
@@ -51,6 +52,11 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
 
   const [sugerenciasTags, setSugerenciasTags] = useState<string[]>([]);
   const [mostrarSugerenciasTags, setMostrarSugerenciasTags] = useState(false);
+
+  // --- NUEVOS ESTADOS PARA EL BUSCADOR VISUAL ---
+  const [modalScraperAbierto, setModalScraperAbierto] = useState(false);
+  const [resultadosScraper, setResultadosScraper] = useState<any[]>([]);
+  const [buscandoScraper, setBuscandoScraper] = useState(false);
 
   useEffect(() => {
     fetch("http://localhost:5078/api/configuracion")
@@ -288,6 +294,111 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
       setGuardando(false);
     }
   };
+  // --- FUNCIÓN PARA BUSCAR POR TÍTULO ---
+  const buscarPorTituloScraper = async () => {
+    if (!titulo || titulo.trim() === "") {
+      alert("⚠️ Primero escribí al menos una parte del Título para poder buscar.");
+      return;
+    }
+
+    setBuscandoScraper(true);
+    setModalScraperAbierto(true); 
+    setResultadosScraper([]);
+
+    try {
+      const res = await fetch(`http://localhost:5078/api/libros/scraper/buscar?titulo=${encodeURIComponent(titulo)}&proveedor=${proveedorScraper}`);
+      
+      if (res.ok) {
+        const data = await res.json();
+        
+        if (Array.isArray(data)) {
+          setResultadosScraper(data);
+        } 
+        else if (data.mensaje) {
+          alert("🕵️‍♂️ El Sabueso dice: " + data.mensaje);
+          if (data.html_crudo) {
+            console.log("=== RADIOGRAFÍA ===");
+            console.log(data.html_crudo);
+          }
+          setResultadosScraper([]); 
+        }
+      } else {
+        const errorData = await res.json();
+        alert("Error: " + (errorData.mensaje || "No se pudo conectar con el proveedor."));
+        setModalScraperAbierto(false);
+      }
+    } catch (error) {
+      alert("Error de conexión con el servidor local.");
+      setModalScraperAbierto(false);
+    } finally {
+      setBuscandoScraper(false);
+    }
+  };
+
+  // --- FUNCIÓN PARA CUANDO EL USUARIO HACE CLIC EN "ELEGIR ESTE" (MODO EDICIÓN) ---
+  const seleccionarLibroScraper = async (libro: any) => {
+    // 1. EVALUAR LA PORTADA (Viene en la primera búsqueda)
+    let aplicarPortada = false;
+    if (libro.portadaUrl) {
+      if (!portadaUrl) {
+        aplicarPortada = true; // Si está vacío, aplicamos directo
+      } else {
+        aplicarPortada = window.confirm("🖼️ Este libro ya tiene una portada cargada. ¿Querés REEMPLAZARLA por la que encontró el scraper?");
+      }
+      
+      if (aplicarPortada) {
+        setPortadaUrl(libro.portadaUrl);
+        // Si tenés un estado de preview para mostrarla en el momento, actualizalo también:
+        if (typeof setPortadaPreview === 'function') setPortadaPreview(libro.portadaUrl); 
+      }
+    }
+
+    // // 2. BUSCAR EL DETALLE PROFUNDO (Para la sinopsis)
+    // let sinopsisEncontrada = libro.resumen; // A veces el resumen corto viene en el primer fetch
+
+    // if (libro.linkComercial) {
+    //   setBuscandoScraper(true); 
+    //   try {
+    //     const res = await fetch(`http://localhost:5078/api/libros/scraper/detalle?url=${encodeURIComponent(libro.linkComercial)}&autorOriginal=${encodeURIComponent(libro.autor)}`);
+        
+    //     if (res.ok) {
+    //       const detalle = await res.json();
+    //       // Solo rescatamos el resumen detallado, ignoramos título, páginas, ISBN, etc.
+    //       if (detalle.resumen && detalle.resumen !== "") {
+    //         sinopsisEncontrada = detalle.resumen;
+    //       }
+    //     }
+    //   } catch (error) {
+    //     console.error("Falló el 2do scrape", error);
+    //   } finally {
+    //     setBuscandoScraper(false);
+    //   }
+    // }
+
+    // // 3. EVALUAR LA SINOPSIS
+    // let aplicarSinopsis = false;
+    // if (sinopsisEncontrada) {
+    //   // reseniaSinopsis es el estado actual de tu formulario
+    //   if (!reseniaSinopsis || reseniaSinopsis.trim() === "") {
+    //     aplicarSinopsis = true;
+    //   } else {
+    //     aplicarSinopsis = window.confirm("📝 Este libro ya tiene una sinopsis. ¿Querés REEMPLAZARLA por la encontrada en internet?");
+    //   }
+
+    //   if (aplicarSinopsis) {
+    //     setReseniaSinopsis(sinopsisEncontrada);
+    //   }
+    //}
+
+    // 4. FEEDBACK Y CIERRE
+    if (!aplicarPortada /*&& !aplicarSinopsis*/) {
+      alert("No se actualizaron datos (el scraper no encontró información nueva o elegiste no reemplazar la existente).");
+    } else {
+      alert("✅ ¡Datos actualizados en el formulario! Recordá presionar el botón de Guardar para confirmar los cambios en la base de datos.");
+    }
+
+    setModalScraperAbierto(false); 
+  };
 
   // CLASES BASE PARA LOS INPUTS DEPENDIENDO DEL TEMA
   const inputBaseClass = `w-full border p-2.5 rounded-lg outline-none transition font-medium ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-[var(--acento)]' : 'bg-gray-50 border-gray-300 focus:ring-2 focus:ring-[var(--acento)] text-gray-900'}`;
@@ -308,7 +419,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
           </Link>
         </div>
       </nav>
-      
+
       <div className={`max-w-5xl mx-auto p-8 rounded-2xl shadow-sm border border-t-4 transition-colors mb-12 ${config?.temaId === 'obsidian' ? 'bg-[var(--card-bg)] border-white/10 border-t-yellow-500' : 'bg-white border-gray-200 border-t-yellow-500'}`}>
         <div className={`flex justify-between items-center mb-6 border-b pb-4 gap-4 ${config?.temaId === 'obsidian' ? 'border-white/10' : 'border-gray-100'}`}>
           <div>
@@ -320,30 +431,60 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
           </span>
         </div>
 
-        <form onSubmit={guardarEdicion} className="space-y-10">
+        <form onSubmit={guardarEdicion} className="space-y-8">
           
           {/* SECCIÓN 1: DATOS BIBLIOGRÁFICOS */}
           <section>
-            <h2 className={`text-lg font-semibold mb-5 p-3 rounded-lg border shadow-sm flex items-center gap-2 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 text-[var(--acento)] border-white/10' : 'bg-gray-50 text-[var(--acento)] border-gray-200'}`}>
+            <h2 className={`text-lg font-semibold mb-4 p-2 rounded flex items-center gap-2 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 text-[var(--acento)]' : 'bg-gray-50 text-[var(--acento)] border border-gray-200'}`}>
               <span>1️⃣</span> Ficha Bibliográfica Principal
             </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className={labelBaseClass}>Título *</label>
-                <input type="text" required className={inputBaseClass} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+                <input 
+                  type="text" 
+                  required 
+                  className={inputBaseClass} 
+                  value={titulo} 
+                  onChange={(e) => setTitulo(e.target.value)} 
+                />
+                
+                <div className="flex space-betwen pt-2">
+                  <select 
+                    className={`border p-2.5 rounded-lg font-bold outline-none transition ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-orange-500' : 'bg-gray-50 border-gray-300 text-gray-700 focus:border-orange-500'}`}
+                    value={proveedorScraper}
+                    onChange={(e) => setProveedorScraper(e.target.value)}
+                  >
+                    <option value="yenny">Yenny</option>
+                    <option value="openlibrary">OpenLibrary</option>
+                  </select>
+
+                  <button 
+                    type="button" 
+                    onClick={buscarPorTituloScraper}
+                    className="bg-[var(--acento)] hover:bg-[var(--acento)] hover:brightness-110 text-white px-4 rounded-lg font-bold transition shadow-sm flex items-center gap-2 whitespace-nowrap ml-2"
+                  >
+                    🕵️‍♂️ Buscar
+                  </button>
+                  
+                  <span className={`text-xs mt-1 font-medium inline-block px-2 py-0.5 rounded border ml-4 flex items-center ${config?.temaId === 'obsidian' ? 'bg-amber-900/30 text-white border-amber-700' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                    ⚠️ Solo Portada
+                  </span>
+                </div>
               </div>
-              <div>
+              
+              <div className="col-span-2 md:col-span-1">
                 <label className={labelBaseClass}>Subtítulo</label>
                 <input type="text" className={`${inputBaseClass} ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-600'}`} value={subtitulo} onChange={(e) => setSubtitulo(e.target.value)} />
               </div>
-
-              <div className="relative">
+              
+              {/* --- CAMPO AUTOR CON AUTOCOMPLETADO --- */}
+              <div className="col-span-2 md:col-span-1 relative">
                 <label className={labelBaseClass}>Autor Principal *</label>
                 <input 
                   type="text" 
                   required 
-                  className={`w-full border p-2.5 rounded-lg outline-none transition ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-[var(--acento)]/30 text-white focus:border-[var(--acento)]' : 'bg-gray-50 border-gray-300 focus:ring-2 focus:ring-[var(--acento)] text-gray-900'}`} 
+                  className={`w-full border p-2.5 rounded-lg outline-none font-bold transition ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-[var(--acento)]/30 text-white focus:border-[var(--acento)]' : 'bg-gray-50 border-gray-300 focus:ring-2 focus:ring-[var(--acento)] text-gray-900'}`} 
                   placeholder="Ej: Borges, Jorge Luis" 
                   value={autorPrincipal} 
                   onChange={(e) => manejarCambioAutor(e.target.value)} 
@@ -371,54 +512,63 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                 </p>
               </div>
 
-              <div>
-                <label className={labelBaseClass}>Editorial</label>
-                <input type="text" className={inputBaseClass} value={editorial} onChange={(e) => setEditorial(e.target.value)} />
+              <div className="col-span-2">
+                <label className={labelBaseClass}>Reseña / Sinopsis / Índice</label>
+                <textarea 
+                  rows={5}
+                  placeholder="Escriba o pegue la sinopsis del libro..."
+                  className={`${inputBaseClass} text-sm leading-relaxed`} 
+                  value={reseniaSinopsis} 
+                  onChange={(e) => setReseniaSinopsis(e.target.value)} 
+                />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelBaseClass}>Año Pub.</label>
-                  <input type="text" placeholder="Ej: 1995" className={inputBaseClass} value={anioPublicacion} onChange={(e) => setAnioPublicacion(e.target.value)} />
-                </div>
-                <div>
-                  <label className={labelBaseClass}>ISBN</label>
-                  <input 
-                    type="text" 
-                    placeholder="978..."
-                    className={inputBaseClass} 
-                    value={isbn} 
-                    onChange={(e) => setIsbn(e.target.value)} 
-                  />
-                  </div>
-                  <div className="flex col-span-2 items-center">
-                    <div><span className={`text-sm font-medium mr-2 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-700'}`}>Origen Datos:</span></div>
-                  <div className="flex-1">
-                      <select 
-                        className={`w-full border p-2 rounded-lg text-sm font-medium outline-none transition mr-2 ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-[var(--acento)]' : 'bg-gray-50 border-gray-300 text-gray-900 focus:ring-2 focus:ring-[var(--acento)]'}`}
-                        value={proveedorDatos}
-                        onChange={(e) => setProveedorDatos(e.target.value)}
-                      >
-                        <option value="todas">🚀 Todas </option>
-                        <option value="google">🔍 Solo Google Books</option>
-                        <option value="openlibrary">📚 Solo Open Library</option>
-                      </select>
-                      </div>
-                      <div className="ml-2 w-1/2">
-                  <button 
-                    type="button" 
-                    onClick={buscarDatosPorIsbn}
-                    disabled={buscandoIsbn}
-                    className={`w-full justify-center px-3 py-2 rounded-lg border transition flex items-center gap-2 text-sm font-bold ${buscandoIsbn ? (config?.temaId === 'obsidian' ? 'bg-slate-800 text-slate-500 border-slate-700' : 'bg-gray-100 text-gray-400 border-gray-200') : (config?.temaId === 'obsidian' ? 'bg-[var(--acento)]/20 text-white border-[var(--acento)]/40 hover:bg-[var(--acento)]/30' : 'bg-gray-100 text-white border-gray-200 hover:bg-gray-200')}`}
-                  >
-                    {buscandoIsbn ? '⏳ Buscando...' : '✨ Autocompletar'}
-                  </button>
-                  </div>
-                  </div>
-                </div>
             </div>
             
-            {/* --- PANEL DE PORTADA Y DATOS EXPANSIBLES --- */}
-            <div className={`grid grid-cols-1 md:grid-cols-4 gap-6 mt-8 p-6 border rounded-2xl shadow-inner ${config?.temaId === 'obsidian' ? 'bg-slate-800/40 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+            <div className="mt-4">
+              <label className={labelBaseClass}>Editorial</label>
+              <input type="text" className={inputBaseClass} value={editorial} onChange={(e) => setEditorial(e.target.value)} />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <div>
+                <label className={labelBaseClass}>Año Pub.</label>
+                <input type="text" placeholder="Ej: 1995" className={inputBaseClass} value={anioPublicacion} onChange={(e) => setAnioPublicacion(e.target.value)} />
+              </div>
+              <div>
+                <label className={labelBaseClass}>ISBN</label>
+                <input 
+                  type="text" 
+                  placeholder="978..."
+                  className={`${inputBaseClass} mb-2`} 
+                  value={isbn} 
+                  onChange={(e) => setIsbn(e.target.value)} 
+                />
+                
+                <select 
+                  className={`w-full border p-2.5 rounded-lg text-sm font-medium outline-none transition flex-1 mb-2 ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-[var(--acento)]' : 'bg-gray-50 border-gray-300 text-gray-900 focus:ring-2 focus:ring-[var(--acento)]'}`}
+                  value={proveedorDatos}
+                  onChange={(e) => setProveedorDatos(e.target.value)}
+                >
+                  <option value="todas">🚀 Todas </option>
+                  <option value="google">🔍 Solo Google Books</option>
+                  <option value="openlibrary">📚 Solo Open Library</option>
+                </select>
+                <button 
+                  type="button" 
+                  onClick={buscarDatosPorIsbn}
+                  disabled={buscandoIsbn}
+                  className={`w-full justify-center px-3 py-2 rounded-lg border transition flex items-center gap-2 text-sm font-bold ${buscandoIsbn ? (config?.temaId === 'obsidian' ? 'bg-slate-800 text-slate-500 border-slate-700' : 'bg-gray-100 text-gray-400 border-gray-200') : (config?.temaId === 'obsidian' ? 'bg-[var(--acento)]/20 text-[var(--acento)] border-[var(--acento)]/40 hover:bg-[var(--acento)]/30' : 'bg-gray-100 text-[var(--acento)] border-gray-200 hover:bg-gray-200')}`}
+                  title="Buscar datos automáticamente"
+                >
+                  {buscandoIsbn ? '⏳ Buscando...' : '✨ Autocompletar desde Internet'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* PANEL DE PORTADA Y DATOS EXPANSIBLES (ESTÉTICA DE LIBRO NUEVO) */}
+          <section>
+            <div className={`grid grid-cols-4 gap-6 mt-8 p-6 border rounded-2xl shadow-inner ${config?.temaId === 'obsidian' ? 'bg-slate-800/40 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
               
               <div className="col-span-1 flex flex-col items-center">
                 <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${config?.temaId === 'obsidian' ? 'text-slate-500' : 'text-gray-400'}`}>Portada Actual</h4>
@@ -431,98 +581,102 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                 </div>
               </div>
 
-              <div className="col-span-1 md:col-span-3 space-y-4">
-                <div className={`border-2 border-dashed p-4 rounded-lg shadow-inner mb-3 ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 border-[var(--acento)]/30' : 'bg-white border-[var(--acento)]/30'}`}>
-                  <h4 className={`text-sm font-bold mb-2 flex items-center gap-1 text-[var(--acento)]`}><span>💾</span> Opciones Locales (Autonomía)</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <label className={`flex items-center gap-2 cursor-pointer text-sm font-medium p-2 rounded-lg border transition ${config?.temaId === 'obsidian' ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700' : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200'}`}>
-                      <input 
-                        type="checkbox" 
-                        checked={usarPortadaLocal} 
-                        onChange={(e) => setUsarPortadaLocal(e.target.checked)} 
-                        className={`w-5 h-5 rounded ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-600 text-[var(--acento)] focus:ring-[var(--acento)]' : 'text-[var(--acento)] focus:ring-[var(--acento)] border-gray-300'}`}
-                      />
-                      Usar Portada Local
-                    </label>
+              <div className="col-span-3 space-y-4">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="col-span-1">
+                    <label className={labelBaseClass}>Nº Páginas</label>
+                    <input 
+                      type="number" 
+                      placeholder="Ej: 350"
+                      className={inputBaseClass} 
+                      value={cantidadPaginas} 
+                      onChange={(e) => setCantidadPaginas(e.target.value)} 
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <label className={labelBaseClass}>URL de Portada</label>
+                    <input 
+                      type="text" 
+                      placeholder="Se completa automáticamente"
+                      className={`w-full border p-2.5 rounded-lg outline-none text-xs font-mono mb-4 transition ${config?.temaId === 'obsidian' ? 'bg-slate-900 border-slate-700 text-slate-400 focus:border-[var(--acento)]' : 'bg-gray-100 border-gray-200 text-gray-600 focus:ring-2 focus:ring-[var(--acento)]'}`} 
+                      value={portadaUrl} 
+                      onChange={(e) => {
+                        setPortadaUrl(e.target.value);
+                        setPortadaPreview(e.target.value);
+                      }} 
+                    />
                     
-                    <div>
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        className={`w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border file:text-xs file:font-bold file:cursor-pointer ${config?.temaId === 'obsidian' ? 'text-slate-400 file:bg-slate-800 file:border-slate-600 file:text-[var(--acento)] hover:file:bg-slate-700' : 'text-gray-500 file:bg-white file:border-gray-300 file:text-[var(--acento)] hover:file:bg-gray-100'}`}
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0];
-                            setArchivoPortada(file);
-                            setUsarPortadaLocal(true);
-                            setPortadaPreview(URL.createObjectURL(file));
-                          }
-                        }}
-                      />
-                      <p className={`text-[10px] mt-1 pl-1 ${config?.temaId === 'obsidian' ? 'text-slate-500' : 'text-gray-400'}`}>Permitido: JPG, PNG. Máx 5MB.</p>
+                    <div className={`border p-4 rounded-lg shadow-inner mb-3 ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 border-[var(--acento)]/30' : 'bg-white border-[var(--acento)]/30'}`}>
+                      <h4 className={`text-sm font-bold mb-2 flex items-center gap-1 ${config?.temaId === 'obsidian' ? 'text-[var(--acento)]' : 'text-[var(--acento)]'}`}><span>💾</span> Opciones Locales (Autonomía)</h4>
+                      <div className="flex items-center gap-6">
+                        <label className={`flex items-center gap-2 cursor-pointer text-sm font-medium p-2 rounded-lg border transition ${config?.temaId === 'obsidian' ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700' : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200'}`}>
+                          <input 
+                            type="checkbox" 
+                            checked={usarPortadaLocal} 
+                            onChange={(e) => setUsarPortadaLocal(e.target.checked)} 
+                            className={`w-5 h-5 rounded ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-600 text-[var(--acento)] focus:ring-[var(--acento)]' : 'text-[var(--acento)] focus:ring-[var(--acento)] border-gray-300'}`}
+                          />
+                          Usar Portada Local (A prueba de cortes)
+                        </label>
+                        
+                        <div>
+                          <label className={`block text-xs font-bold uppercase tracking-wide mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Subir imagen a mano</label>
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            className={`w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:cursor-pointer ${config?.temaId === 'obsidian' ? 'text-slate-400 file:bg-slate-800 file:text-[var(--acento)] hover:file:bg-slate-700' : 'text-gray-500 file:bg-gray-100 file:text-[var(--acento)] hover:file:bg-gray-200'}`}
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setArchivoPortada(e.target.files[0]);
+                                setUsarPortadaLocal(true); 
+                                setPortadaPreview(URL.createObjectURL(e.target.files[0]));
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  </div>
-
-                <div>
-                  <label className={labelBaseClass}>Reseña / Sinopsis / Índice</label>
-                  <textarea 
-                    rows={6}
-                    placeholder="Escriba o pegue la sinopsis o el índice del libro..."
-                    className={`${inputBaseClass} text-sm leading-relaxed`} 
-                    value={reseniaSinopsis} 
-                    onChange={(e) => setReseniaSinopsis(e.target.value)} 
-                  />
                 </div>
               </div>
             </div>
           </section>
 
-          {/* SECCIÓN UBICACIÓN Y TAGS */}
+          {/* NUEVA SECCIÓN: ETIQUETAS */}
           <section>
-            <h2 className={`text-lg font-semibold mb-5 p-3 rounded-lg border shadow-sm flex items-center gap-2 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 text-[var(--acento)] border-white/10' : 'bg-gray-50 text-[var(--acento)] border-gray-200'}`}>
-              <span>2️⃣</span> Clasificación y Materias
+            <h2 className={`text-lg font-semibold mb-4 p-2 rounded flex items-center gap-2 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 text-[var(--acento)]' : 'bg-gray-50 text-[var(--acento)] border border-gray-200'}`}>
+              <span>2️⃣</span> Etiquetas y Materias
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className={`p-4 rounded-xl border shadow-inner ${config?.temaId === 'obsidian' ? 'bg-slate-800/50 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
-                <label className={`block text-sm font-bold mb-2 uppercase tracking-wide ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-700'}`}>Clasificación (CDU/Dewey)</label>
-                <input type="text" placeholder="Ej: 863 (Novela)" className={`w-full border-2 p-3 rounded-lg outline-none font-mono text-lg font-bold transition ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-[var(--acento)]' : 'bg-white border-gray-300 text-gray-800 focus:border-[var(--acento)]'}`} value={clasificacion} onChange={(e) => setClasificacion(e.target.value)} />
-              </div>
-              <div className={`p-4 rounded-xl border shadow-inner ${config?.temaId === 'obsidian' ? 'bg-slate-800/50 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
-                <label className={`block text-sm font-bold mb-2 uppercase tracking-wide ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-700'}`}>Cutter-Sanborn</label>
-                <input type="text" placeholder="Ej: B732" className={`w-full border-2 p-3 rounded-lg outline-none font-mono text-lg font-bold transition ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-[var(--acento)]' : 'bg-white border-gray-300 text-gray-800 focus:border-[var(--acento)]'}`} value={codigoCutter} onChange={(e) => setCodigoCutter(e.target.value)} />
-              </div>
-            </div>
-            
-            <div className={`border p-5 rounded-xl ${config?.temaId === 'obsidian' ? 'bg-slate-800/40 border-white/5' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
+            <div className={`border p-4 rounded-lg ${config?.temaId === 'obsidian' ? 'bg-slate-800/40 border-white/5' : 'bg-gray-50 border-gray-300'}`}>
               <label className={`block text-sm font-bold mb-3 ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-700'}`}>
-                Temas y Etiquetas (Escribí y apretá <kbd className={`px-1.5 py-0.5 rounded border font-sans text-xs ${config?.temaId === 'obsidian' ? 'bg-slate-700 border-slate-600' : 'bg-gray-200 border-gray-300'}`}>Enter</kbd> o coma)
+                Agregar Tags (Escribí el tema y apretá <kbd className={`px-1.5 py-0.5 rounded border font-sans text-xs ${config?.temaId === 'obsidian' ? 'bg-slate-700 border-slate-600' : 'bg-gray-200 border-gray-300'}`}>Enter</kbd> o coma)
               </label>
               {tags.length > 0 && (
-                  <button 
-                    type="button" 
-                    onClick={() => setTags([])} 
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition flex items-center gap-1 shadow-sm mb-1 ${config?.temaId === 'obsidian' ? 'bg-red-900/20 text-red-400 border-red-500/30 hover:bg-red-900/40' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:text-red-800'}`}
-                    title="Borrar todas las etiquetas"
-                  >
-                    🗑️ Limpiar todo ({tags.length})
-                  </button>
-                )}
-              <div className={`flex flex-wrap gap-2.5 mb-4 p-2 min-h-[50px] rounded-lg border shadow-inner ${config?.temaId === 'obsidian' ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200'}`}>
+                <button 
+                  type="button" 
+                  onClick={() => setTags([])} 
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition flex items-center gap-1 shadow-sm mb-3 ${config?.temaId === 'obsidian' ? 'bg-red-900/20 text-red-400 border-red-500/30 hover:bg-red-900/40' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:text-red-800'}`}
+                  title="Borrar todas las etiquetas"
+                >
+                  🗑️ Limpiar todo ({tags.length})
+                </button>
+              )}
+              
+              <div className="flex flex-wrap gap-2 mb-3">
                 {tags.map((tag, index) => (
-                  <span key={index} className="bg-[var(--acento)] text-white text-sm font-bold px-3 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
-                    {tag} <button type="button" onClick={() => removerTag(tag)} className="opacity-70 hover:opacity-100 font-bold transition text-lg leading-none">×</button>
+                  <span key={index} className="bg-[var(--acento)] text-[var(--acento-texto)] text-sm font-bold px-3 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
+                    {tag}
+                    <button type="button" onClick={() => removerTag(tag)} className="opacity-70 hover:opacity-100 font-bold transition text-lg leading-none">×</button>
                   </span>
                 ))}
-                {tags.length === 0 && <span className={`text-sm italic p-1 ${config?.temaId === 'obsidian' ? 'text-slate-500' : 'text-gray-400'}`}>No hay etiquetas asignadas...</span>}
               </div>
-              
+
               {/* --- CAMPO TAGS CON AUTOCOMPLETADO TESAURO --- */}
               <div className="relative">
                 <input 
                   type="text" 
                   placeholder="Buscar en el Tesauro (Ej: Educación, Ficción...)" 
-                  className={`w-full border-2 p-3 rounded-lg outline-none font-medium transition ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700 text-white focus:border-[var(--acento)]' : 'bg-white border-gray-300 focus:border-[var(--acento)]'}`} 
+                  className={inputBaseClass} 
                   value={tagInput} 
                   onChange={(e) => manejarCambioTag(e.target.value)}
                   onKeyDown={manejarInputTag}
@@ -543,18 +697,42 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
                   </ul>
                 )}
               </div>
-
             </div>
           </section>
 
-          {/* SECCIÓN EJEMPLARES */}
+          {/* SECCIÓN SIGNATURA TOPOGRÁFICA */}
           <section>
-            <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-5 p-3 rounded-lg border shadow-sm gap-3 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
-              <h2 className={`text-lg font-semibold flex items-center gap-2 text-[var(--acento)]`}>
-                <span>3️⃣</span> Inventario de Copias Físicas
+            <h2 className={`text-lg font-semibold mb-4 p-2 rounded flex items-center gap-2 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 text-[var(--acento)]' : 'bg-gray-50 text-[var(--acento)] border border-gray-200'}`}>
+              <span>3️⃣</span> Ubicación en Estante
+            </h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelBaseClass}>Clasificación (Ej: 863)</label>
+                <input type="text" className={`${inputBaseClass} font-mono`} value={clasificacion} onChange={(e) => setClasificacion(e.target.value)} />
+              </div>
+              <div>
+                <label className={labelBaseClass}>Cutter-Sanborn (Ej: B732)</label>
+                <input 
+                  type="text" 
+                  className={`${inputBaseClass} font-mono`} 
+                  value={codigoCutter} 
+                  onChange={(e) => setCodigoCutter(e.target.value)} 
+                />
+                <p className={`text-[10px] mt-1 font-medium inline-block px-2 py-0.5 rounded border shadow-sm ${config?.temaId === 'obsidian' ? 'bg-amber-900/30 text-white border-amber-700' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                  ⚠️ Ojo: Revisar si el autor tenía apellido compuesto.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* SECCIÓN EJEMPLARES FÍSICOS (Con lógica de edición) */}
+          <section>
+            <div className={`flex justify-between items-center mb-4 p-2 rounded border ${config?.temaId === 'obsidian' ? 'bg-slate-800/80 border-white/10' : 'bg-gray-100 border-gray-200'}`}>
+              <h2 className={`text-lg font-semibold flex items-center gap-2 ${config?.temaId === 'obsidian' ? 'text-[var(--acento)]' : 'text-gray-800'}`}>
+                <span>4️⃣</span> Inventario de Copias Físicas
               </h2>
-              <button type="button" onClick={agregarEjemplar} className="text-sm bg-[var(--acento)] text-white hover:bg-[var(--acento)]/80 px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 w-full md:w-auto justify-center shadow-sm">
-                ➕ Agregar Copia Física
+              <button type="button" onClick={agregarEjemplar} className="text-sm bg-[var(--acento)] text-white hover:bg-[var(--acento)] hover:brightness-110 px-3 py-1 rounded font-bold transition shadow-sm">
+                + Agregar Copia
               </button>
             </div>
             
@@ -584,7 +762,7 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
             </div>
           </section>
 
-          {/* BOTONERA FINAL */}
+          {/* BOTONES FINALES */}
           <div className={`flex flex-col md:flex-row justify-end gap-3 pt-8 border-t mt-10 ${config?.temaId === 'obsidian' ? 'border-white/10' : 'border-gray-100'}`}>
             <Link href={`/libros/${id}`} className={`px-6 py-3 font-bold rounded-xl transition text-center order-2 md:order-1 border md:border-none ${config?.temaId === 'obsidian' ? 'text-slate-400 hover:bg-slate-800 border-slate-700' : 'text-gray-600 hover:bg-gray-100 border-gray-200'}`}>
               Cancelar y Volver
@@ -595,6 +773,92 @@ export default function EditarLibroCatalogo({ params }: { params: Promise<{ id: 
           </div>
         </form>
       </div>
+      {/* ========================================== */}
+      {/* MODAL DEL SCRAPER (VENTANA FLOTANTE)         */}
+      {/* ========================================== */}
+      {modalScraperAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] border-2 border-orange-500 ${config?.temaId === 'obsidian' ? 'bg-slate-900' : 'bg-white'}`}>
+            
+            {/* Cabecera del Modal */}
+            <div className="bg-orange-500 text-white p-4 flex justify-between items-center shadow-md z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🕵️‍♂️</span>
+                <h3 className="font-bold text-lg tracking-wider">Resultados de Librerías Comerciales</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setModalScraperAbierto(false)} 
+                className="text-white hover:text-orange-200 text-3xl font-black leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Cuerpo del Modal (Lista de Libros) */}
+            <div className={`p-6 overflow-y-auto flex-1 ${config?.temaId === 'obsidian' ? 'bg-slate-900' : 'bg-gray-50'}`}>
+              {buscandoScraper ? (
+                <div className="text-center py-16 text-orange-500 font-bold animate-pulse text-xl flex flex-col items-center gap-4">
+                  <span className="text-5xl animate-spin">⏳</span>
+                  Rastreando catálogos en la web...
+                </div>
+              ) : resultadosScraper.length === 0 ? (
+                <div className={`text-center py-16 font-medium text-lg ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>
+                  No se encontraron libros con ese título. <br/>Intentá escribir una palabra clave más corta (Ej: "Matematica" en vez de "Libro de Matematica 3").
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {resultadosScraper.map((libro, idx) => (
+                    <div key={idx} className={`border rounded-xl p-4 flex gap-4 hover:shadow-lg hover:border-orange-300 transition items-center ${config?.temaId === 'obsidian' ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+                      
+                      {/* Portada */}
+                      <div className={`w-16 h-24 rounded-lg shadow-sm flex-shrink-0 overflow-hidden border ${config?.temaId === 'obsidian' ? 'bg-slate-900 border-slate-600' : 'bg-gray-100 border-gray-200'}`}>
+                        {libro.portadaUrl ? (
+                          <img src={libro.portadaUrl} alt="Portada" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 font-bold text-center p-1">Sin Foto</div>
+                        )}
+                      </div>
+                      
+                      {/* Datos */}
+                      <div className="flex-1">
+                        <h4 className={`font-bold text-lg leading-tight mb-1 ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-800'}`}>{libro.titulo}</h4>
+                        {/* NUEVO: Botoncito de Link Externo */}
+                          {libro.linkExterno && (
+                            <a 
+                              href={libro.linkExterno} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              title="Ver en la página original"
+                              className={`text-xl hover:scale-110 transition-transform ${config?.temaId === 'obsidian' ? 'text-blue-400' : 'text-blue-600'}`}
+                            >
+                              🔗
+                            </a>
+                          )}
+                        
+                        <p className={`text-sm font-bold ${config?.temaId === 'obsidian' ? 'text-blue-400' : 'text-blue-800'}`}>{libro.autor}</p>
+                        <p className={`text-xs mt-2 italic inline-block px-2 py-1 rounded border ${config?.temaId === 'obsidian' ? 'bg-slate-700/50 border-slate-600 text-slate-300' : 'bg-gray-50 border-gray-100 text-gray-500'}`}>
+                          {libro.resumen}
+                        </p>
+                      </div>
+                      
+                      {/* Botón de Selección */}
+                      <button
+                        type="button"
+                        onClick={() => seleccionarLibroScraper(libro)}
+                        className="bg-green-100 text-green-800 border border-green-300 hover:bg-green-500 hover:text-white px-5 py-3 rounded-xl font-bold transition shadow-sm whitespace-nowrap flex flex-col items-center"
+                      >
+                        <span>✅ Elegir</span>
+                      </button>
+
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 interface Props {
   prestamoId: number;
   tituloLibro: string;
+  onDevuelto: () => void; // Función opcional para actualizar la lista en el frontend
 }
 
-export default function BotonDevolver({ prestamoId, tituloLibro }: Props) {
+export default function BotonDevolver({ prestamoId, tituloLibro, onDevuelto }: Props) {
   const router = useRouter();
 
   const handleDevolver = async () => {
@@ -25,7 +26,8 @@ export default function BotonDevolver({ prestamoId, tituloLibro }: Props) {
       if (res.ok) {
         alert("¡Libro devuelto y stock actualizado!");
         // Esta es la magia de Next.js: recarga los datos de la tabla en el fondo sin parpadear
-        router.refresh(); 
+        router.refresh();
+        if (onDevuelto) onDevuelto();
       } else {
         const data = await res.json();
         alert("Error: " + data.mensaje);

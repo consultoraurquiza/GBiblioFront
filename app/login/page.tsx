@@ -36,7 +36,7 @@ export default function Login() {
       Cookies.set("biblioteca_token", data.token, { expires: 1/3 }); 
       
       // Si todo sale bien, lo mandamos al panel de administración o al inicio
-      router.push("/libros/nuevo"); // Podés cambiar a dónde lo querés redirigir
+      router.push("/admin"); // Podés cambiar a dónde lo querés redirigir
       
     } catch (err: any) {
       setError(err.message);

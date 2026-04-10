@@ -449,9 +449,9 @@ export default function NuevoLibroCatalogo() {
                     🕵️‍♂️ Buscar
                   </button>
                   
-                  <span className={`text-xs mt-1 font-medium inline-block px-2 py-0.5 rounded border ml-4 flex items-center ${config?.temaId === 'obsidian' ? 'bg-amber-900/30 text-white border-amber-700' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                  {/* <span className={`text-xs mt-1 font-medium inline-block px-2 py-0.5 rounded border ml-4 flex items-center ${config?.temaId === 'obsidian' ? 'bg-amber-900/30 text-white border-amber-700' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
                     ⚠️ El mismo campo de titulo puede usarse para buscar ingresando el nombre del autor
-                  </span>
+                  </span> */}
                 </div>
               </div>
               

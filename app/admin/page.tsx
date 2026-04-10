@@ -229,10 +229,66 @@ export default function CatalogoOPAC() {
                 >
                   ← Anterior
                 </button>
+                {/* INPUT DE SALTO RÁPIDO */}
+                <div className={`flex items-center gap-2 text-sm sm:text-base font-bold ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <span>Página</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPaginas}
+                    // Usamos defaultValue y key para que se actualice si cambiamos con los botones laterales
+                    defaultValue={paginaActual}
+                    key={paginaActual} 
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const valor = parseInt(e.currentTarget.value, 10);
+                        if (valor >= 1 && valor <= totalPaginas) {
+                          setPaginaActual(valor);
+                        } else {
+                          // Si el usuario pone un número fuera de rango, le avisamos y lo devolvemos a la realidad
+                          e.currentTarget.value = paginaActual.toString();
+                          alert(`Por favor, ingresá un número entre 1 y ${totalPaginas}`);
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Si hace clic afuera sin apretar Enter, devolvemos el valor al número real
+                      e.currentTarget.value = paginaActual.toString();
+                    }}
+                    className={`w-16 text-center py-1.5 rounded-lg border outline-none focus:ring-2 focus:ring-[var(--acento)] transition-all ${config?.temaId === 'obsidian' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                    title="Escribí el número y apretá Enter"
+                  />
+                  <span>de {totalPaginas}</span>
+                </div>
 
-                <span className={`font-bold ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-slate-600'}`}>
+                {/* NUMERITOS CLICKEABLES INTELIGENTES */}
+                <div className="flex items-center gap-1 sm:gap-2">
+                  {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                    // Filtra para mostrar siempre la 1, la última, y 2 para cada lado de la actual
+                    .filter(num => num === 1 || num === totalPaginas || Math.abs(paginaActual - num) <= 2)
+                    .map((num, i, arr) => (
+                      <div key={num} className="flex items-center gap-1 sm:gap-2">
+                        {/* Agrega los puntos suspensivos si hay saltos entre números */}
+                        {i > 0 && arr[i - 1] !== num - 1 && (
+                          <span className={`px-1 font-bold ${config?.temaId === 'obsidian' ? 'text-slate-500' : 'text-gray-400'}`}>...</span>
+                        )}
+                        <button
+                          onClick={() => setPaginaActual(num)}
+                          className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg font-bold transition-all flex items-center justify-center ${
+                            paginaActual === num
+                              ? 'bg-[var(--acento)] text-white scale-110 shadow-md'
+                              : `hover:bg-[var(--acento)] hover:text-white ${config?.temaId === 'obsidian' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'}`
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      </div>
+                  ))}
+                </div>
+
+                {/* <span className={`font-bold ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-slate-600'}`}>
                   Página {paginaActual} de {totalPaginas}
-                </span>
+                </span> */}
 
                 <button
                   onClick={() => setPaginaActual(prev => Math.min(prev + 1, totalPaginas))}

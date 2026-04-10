@@ -37,6 +37,8 @@ export default async function DetalleLibro({ params }: { params: Promise<{ id: s
     );
   }
 
+  
+
   return (
     <main className={`min-h-screen transition-colors duration-700 ${claseTema} bg-[var(--bg-principal)] pb-12`}>
       <nav className="p-4 mb-4 shadow-md bg-[var(--bg-header)] text-[var(--texto-header)] transition-colors print:hidden">

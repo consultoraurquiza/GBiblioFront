@@ -19,6 +19,7 @@ export default function HistorialPrestamos() {
       .catch(err => console.error(err));
   }, []);
 
+  
   // Cada vez que cambia el filtro en el Select, volvemos a llamar a C#
   useEffect(() => {
     const cargarPrestamos = async () => {
@@ -165,6 +166,10 @@ export default function HistorialPrestamos() {
                             <BotonDevolver 
                               prestamoId={prestamo.id} 
                               tituloLibro={prestamo.ejemplar?.libro?.titulo || "Libro"} 
+                              onDevuelto={() => {
+                                setPrestamos(prestamos => prestamos.filter(p => prestamo.id !== prestamo.id));
+                              }
+                            }
                             />
                           )}
                         </td>
