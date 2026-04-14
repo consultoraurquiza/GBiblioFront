@@ -28,6 +28,7 @@ export const config = {
     '/prestamos/:path*',
     '/admin/:path*',
     '/prestar/:path*',
+    '/componentes/:path*',
     // Agregá acá cualquier otra ruta que quieras proteger
   ],
 };

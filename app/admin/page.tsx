@@ -144,6 +144,9 @@ export default function CatalogoOPAC() {
                 <Link href="/libros/nuevo" className="bg-[var(--acento)] text-white hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 shadow-sm">
                   + Ingresar Libro
                 </Link>
+                <Link href="/usuarios" className="bg-[var(--acento)] text-white hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 shadow-sm">
+                  👥 Usuarios
+                </Link>
                 <div className="w-px h-8 bg-black/20 mx-1 hidden md:block"></div>
                 <Link href="/panol" className="bg-[var(--acento)] text-white hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold transition shadow-md flex items-center gap-2">
                   🔌 Pañol Tecnológico

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 
 // Eliminamos los imports de secciones de acá, ya no los necesita la Sidebar
 export default function SideBar({ seccionActiva, setSeccionActiva }: any) {
@@ -30,7 +31,7 @@ export default function SideBar({ seccionActiva, setSeccionActiva }: any) {
       )}
 
       {/* SIDEBAR */}
-      <aside className={`fixed top-0 left-0 h-screen w-72 bg-slate-900 z-[90] p-4 text-slate-300 shadow-2xl transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed top-0 left-0 h-screen w-72 bg-slate-900 z-[90] p-4 text-slate-300 shadow-2xl transition-transform duration-300 flex flex-col ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">C</div>
           <h2 className="font-bold text-white tracking-widest text-sm">CONFIGURACIÓN</h2>
@@ -58,6 +59,23 @@ export default function SideBar({ seccionActiva, setSeccionActiva }: any) {
             🏠 Volver al Buscador
           </button>
         </nav>
+        {/* 3. 👇 NUEVA SECCIÓN DE BOTONES INFERIORES */}
+        {/* El "mt-auto" empuja este div hasta el fondo del menú */}
+        <div className="mt-auto border-t border-slate-700/50 pt-4 space-y-1 justify-end">
+          <Link 
+            href="/tutorial" 
+            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 text-sm transition text-slate-400 hover:text-white"
+          >
+            <span>📖</span> Tutorial de Uso
+          </Link>
+          
+          <Link 
+            href="/about" 
+            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 text-sm transition text-slate-400 hover:text-white"
+          >
+            <span>💡</span> Acerca de
+          </Link>
+        </div>
       </aside>
     </>
   );
