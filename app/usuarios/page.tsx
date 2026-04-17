@@ -7,28 +7,54 @@ export default function UsuariosPage() {
   // ESTADOS DE LA PANTALLA PRINCIPAL
   const [busqueda, setBusqueda] = useState("");
   const [grupoFiltro, setGrupoFiltro] = useState("todos");
-  const [usuarios, setUsuarios] = useState<any[]>([]); 
+  const [usuarios, setUsuarios] = useState<any[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
   const [gruposDisponibles, setGruposDisponibles] = useState<any[]>([]);
 
   // ESTADO DEL MODAL Y FORMULARIO
   const [modalAbierto, setModalAbierto] = useState(false);
-  const [usuarioEditando, setUsuarioEditando] = useState<any>(null); 
+  const [usuarioEditando, setUsuarioEditando] = useState<any>(null);
   const [cargandoGuardar, setCargandoGuardar] = useState(false);
   const [errorValidacion, setErrorValidacion] = useState("");
+
+  // ESTADO DEL HISTORIAL
+  const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
+  const [usuarioHistorial, setUsuarioHistorial] = useState<any>(null);
+  const [prestamosHistorial, setPrestamosHistorial] = useState<any[]>([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
   const [formData, setFormData] = useState({
     dni: "",
     nombre: "",
     apellido: "",
     telefono: "",
-    rol: 0, 
+    rol: 0,
     grupoId: "",
     puedePedirPrestado: true
   });
 
   const [config, setConfig] = useState<any>(null);
   const claseTema = config ? `tema-${config.temaId}` : 'tema-lumina';
+
+
+  const abrirHistorial = async (usuario: any) => {
+    setUsuarioHistorial(usuario);
+    setPrestamosHistorial([]);
+    setModalHistorialAbierto(true);
+    setCargandoHistorial(true);
+
+    try {
+      const res = await fetch(`http://localhost:5078/api/prestamos/usuario/${usuario.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPrestamosHistorial(data);
+      }
+    } catch (error) {
+      console.error("Error al cargar historial", error);
+    } finally {
+      setCargandoHistorial(false);
+    }
+  };
 
   // ==========================================
   // 1. CARGAR USUARIOS DESDE LA API
@@ -77,14 +103,14 @@ export default function UsuariosPage() {
 
     try {
       const metodo = usuarioEditando ? "PUT" : "POST";
-      const url = usuarioEditando 
-        ? `http://localhost:5078/api/usuarios/${usuarioEditando.id}` 
+      const url = usuarioEditando
+        ? `http://localhost:5078/api/usuarios/${usuarioEditando.id}`
         : "http://localhost:5078/api/usuarios";
 
       // Si estamos editando, inyectamos el ID al objeto que mandamos
       // 👇 ACÁ ESTÁ LA MAGIA DE LIMPIEZA DE DATOS 👇
       let payload: any = { ...formData };
-      
+
       // Si es profe o admin, forzamos el grupo a null.
       // Si es alumno, convertimos el string a número (o a null si está vacío).
       if (payload.rol !== 0) {
@@ -130,13 +156,13 @@ export default function UsuariosPage() {
   const abrirModalEditar = (usuario: any) => {
     setUsuarioEditando(usuario);
     setFormData({
-      dni: usuario.dni || "", 
-      nombre: usuario.nombre || "", 
-      apellido: usuario.apellido || "", 
-      telefono: usuario.telefono || "", 
-      rol: usuario.rol || 0, 
+      dni: usuario.dni || "",
+      nombre: usuario.nombre || "",
+      apellido: usuario.apellido || "",
+      telefono: usuario.telefono || "",
+      rol: usuario.rol || 0,
       // 👇 Aseguramos que si viene nulo, el select reciba un string vacío
-      grupoId: usuario.grupoId ? usuario.grupoId.toString() : "", 
+      grupoId: usuario.grupoId ? usuario.grupoId.toString() : "",
       puedePedirPrestado: usuario.puedePedirPrestado !== false
     });
     setErrorValidacion("");
@@ -155,7 +181,7 @@ export default function UsuariosPage() {
 
   return (
     <main className={`min-h-screen transition-colors duration-700 ${claseTema} bg-[var(--bg-principal)] pb-12`}>
-      
+
       <nav className="p-4 mb-8 shadow-md bg-[var(--bg-header)] text-[var(--texto-header)] transition-colors">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -169,22 +195,22 @@ export default function UsuariosPage() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4">
-        
+
         {/* BARRA DE HERRAMIENTAS */}
         <div className={`p-4 rounded-2xl shadow-sm border mb-6 flex flex-col md:flex-row gap-4 items-center justify-between ${config?.temaId === 'obsidian' ? 'bg-[var(--card-bg)] border-white/10' : 'bg-white border-gray-200'}`}>
           <div className="flex flex-1 w-full gap-4">
             <div className="relative flex-1 max-w-md">
               <span className="absolute left-3 top-3 text-gray-400">🔍</span>
-              <input 
-                type="text" 
-                placeholder="Buscar por nombre o DNI (Presione Enter)..." 
+              <input
+                type="text"
+                placeholder="Buscar por nombre o DNI (Presione Enter)..."
                 className={`${inputBaseClass} pl-10`}
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && cargarUsuarios()}
               />
             </div>
-            <select 
+            <select
               className={`${inputBaseClass} max-w-[200px] cursor-pointer`}
               value={grupoFiltro}
               onChange={(e) => setGrupoFiltro(e.target.value)}
@@ -234,7 +260,7 @@ export default function UsuariosPage() {
               ) : (
                 usuarios.map((u) => (
                   <tr key={u.id} className={`border-b last:border-0 transition-colors ${config?.temaId === 'obsidian' ? 'border-slate-800 hover:bg-slate-800/50 text-slate-300' : 'border-gray-100 hover:bg-gray-50 text-gray-700'}`}>
-                    <td className="p-4 font-medium">{u.apellido}, {u.nombre}</td>
+                    <td className="p-4 font-medium max-w-[200px] md:max-w-[300px]">{u.apellido}, {u.nombre}</td>
                     <td className="p-4">{u.dni}</td>
                     <td className="p-4">{formatearRol(u.rol, u.grupo)}</td>
                     <td className="p-4">
@@ -247,6 +273,9 @@ export default function UsuariosPage() {
                     <td className="p-4 text-center">
                       <button onClick={() => abrirModalEditar(u)} className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition shadow-sm">
                         ✏️ Ver/Editar
+                      </button>
+                      <button onClick={() => abrirHistorial(u)} className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition shadow-sm ml-2">
+                        📖 Historial
                       </button>
                     </td>
                   </tr>
@@ -261,7 +290,7 @@ export default function UsuariosPage() {
       {modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className={`rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border-t-4 border-[var(--acento)] ${config?.temaId === 'obsidian' ? 'bg-slate-900' : 'bg-white'}`}>
-            
+
             <div className={`p-6 border-b ${config?.temaId === 'obsidian' ? 'border-slate-800' : 'border-gray-100'}`}>
               <h2 className={`text-xl font-bold ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-800'}`}>
                 {usuarioEditando ? '✏️ Editar Usuario' : '👤 Agregar Nuevo Usuario'}
@@ -278,28 +307,28 @@ export default function UsuariosPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-sm font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-700'}`}>Nombre *</label>
-                  <input type="text" required className={inputBaseClass} value={formData.nombre} onChange={(e) => setFormData({...formData, nombre: e.target.value})} />
+                  <input type="text" required className={inputBaseClass} value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} />
                 </div>
                 <div>
                   <label className={`block text-sm font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-700'}`}>Apellido *</label>
-                  <input type="text" required className={inputBaseClass} value={formData.apellido} onChange={(e) => setFormData({...formData, apellido: e.target.value})} />
+                  <input type="text" required className={inputBaseClass} value={formData.apellido} onChange={(e) => setFormData({ ...formData, apellido: e.target.value })} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-sm font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-700'}`}>DNI *</label>
-                  <input type="text" required className={inputBaseClass} value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value})} placeholder="Sin puntos" />
+                  <input type="text" required className={inputBaseClass} value={formData.dni} onChange={(e) => setFormData({ ...formData, dni: e.target.value })} placeholder="Sin puntos" />
                 </div>
                 <div>
                   <label className={`block text-sm font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-700'}`}>Teléfono</label>
-                  <input type="text" className={inputBaseClass} value={formData.telefono} onChange={(e) => setFormData({...formData, telefono: e.target.value})} />
+                  <input type="text" className={inputBaseClass} value={formData.telefono} onChange={(e) => setFormData({ ...formData, telefono: e.target.value })} />
                 </div>
               </div>
 
               <div>
                 <label className={`block text-sm font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-700'}`}>Rol / Perfil *</label>
-                <select className={inputBaseClass} value={formData.rol} onChange={(e) => setFormData({...formData, rol: parseInt(e.target.value)})}>
+                <select className={inputBaseClass} value={formData.rol} onChange={(e) => setFormData({ ...formData, rol: parseInt(e.target.value) })}>
                   <option value={0}>🎓 Alumno</option>
                   <option value={1}>👨‍🏫 Profesor</option>
                   <option value={2}>⚙️ Administrador</option>
@@ -312,10 +341,10 @@ export default function UsuariosPage() {
                   <label className={`block text-xs font-bold mb-1 uppercase tracking-wide ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>
                     Asignar a un Curso / Grupo *
                   </label>
-                  <select 
-                    className={inputBaseClass} 
-                    value={formData.grupoId} 
-                    onChange={(e) => setFormData({...formData, grupoId: e.target.value})}
+                  <select
+                    className={inputBaseClass}
+                    value={formData.grupoId}
+                    onChange={(e) => setFormData({ ...formData, grupoId: e.target.value })}
                     required={formData.rol === 0}
                   >
                     <option value="">-- Seleccione un curso --</option>
@@ -341,7 +370,7 @@ export default function UsuariosPage() {
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked={formData.puedePedirPrestado} onChange={(e) => setFormData({...formData, puedePedirPrestado: e.target.checked})} />
+                  <input type="checkbox" className="sr-only peer" checked={formData.puedePedirPrestado} onChange={(e) => setFormData({ ...formData, puedePedirPrestado: e.target.checked })} />
                   <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
@@ -349,22 +378,89 @@ export default function UsuariosPage() {
             </div>
 
             <div className={`p-4 flex justify-end gap-3 border-t ${config?.temaId === 'obsidian' ? 'bg-slate-800/50 border-slate-800' : 'bg-gray-50 border-gray-100'}`}>
-              <button 
+              <button
                 type="button"
                 onClick={() => setModalAbierto(false)}
                 className={`px-5 py-2 rounded-lg font-bold transition ${config?.temaId === 'obsidian' ? 'text-slate-300 hover:bg-slate-800' : 'text-gray-600 hover:bg-gray-200'}`}
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={manejarGuardar}
                 disabled={!formData.nombre || !formData.apellido || !formData.dni || cargandoGuardar}
                 className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition shadow-sm">
-              
+
                 {cargandoGuardar ? 'Guardando...' : (usuarioEditando ? 'Actualizar Ficha' : 'Guardar Usuario')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL DE HISTORIAL */}
+      {modalHistorialAbierto && usuarioHistorial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col border-t-4 border-blue-500 ${config?.temaId === 'obsidian' ? 'bg-slate-900' : 'bg-white'}`}>
+
+            <div className={`p-6 border-b flex justify-between items-center ${config?.temaId === 'obsidian' ? 'border-slate-800' : 'border-gray-100'}`}>
+              <div>
+                <h2 className={`text-xl font-bold ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-800'}`}>
+                  📖 Historial de Préstamos
+                </h2>
+                <p className={`text-sm mt-1 font-medium ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>
+                  {usuarioHistorial.nombre} {usuarioHistorial.apellido} (DNI: {usuarioHistorial.dni})
+                </p>
+              </div>
+              <button onClick={() => setModalHistorialAbierto(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {cargandoHistorial ? (
+                <div className="text-center py-8 text-gray-500 font-medium animate-pulse">Cargando historial...</div>
+              ) : prestamosHistorial.length === 0 ? (
+                <div className="text-center py-8">
+                  <span className="text-4xl mb-3 block">📚</span>
+                  <p className={`font-medium ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>
+                    Este usuario aún no ha pedido ningún libro.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {prestamosHistorial.map((p, index) => (
+                    <div key={index} className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${config?.temaId === 'obsidian' ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
+                      <div>
+                        <h4 className={`font-bold ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-800'}`}>{p.titulo}</h4>
+                        <p className={`text-xs font-mono mt-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Inv: {p.inventario}</p>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="text-right">
+                          <p className={config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-600'}>
+                            <span className="font-bold">Salió:</span> {new Date(p.fechaSalida).toLocaleDateString('es-AR')}
+                          </p>
+                          {p.estado === 'Devuelto' && (
+                            <p className={config?.temaId === 'obsidian' ? 'text-slate-300' : 'text-gray-600'}>
+                              <span className="font-bold">Volvió:</span> {new Date(p.fechaDevolucion).toLocaleDateString('es-AR')}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          {p.estado === 'Devuelto' && <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200">Devuelto</span>}
+                          {p.estado === 'Activo' && <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-200">En Curso</span>}
+                          {p.estado === 'Vencido' && <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold border border-red-200 animate-pulse">Vencido</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={`p-4 flex justify-end border-t ${config?.temaId === 'obsidian' ? 'bg-slate-800/50 border-slate-800' : 'bg-gray-50 border-gray-100'}`}>
+              <button onClick={() => setModalHistorialAbierto(false)} className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-sm">
+                Cerrar
+              </button>
+            </div>
+
           </div>
         </div>
       )}

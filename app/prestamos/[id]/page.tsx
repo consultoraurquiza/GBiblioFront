@@ -88,14 +88,14 @@ export default async function DetallePrestamo({ params }: { params: Promise<{ id
             
             {/* Si está activo, mostramos tu botón de devolver acá también */}
             {prestamo.estado === 0 && (
-              <BotonDevolver prestamoId={prestamo.id} tituloLibro={prestamo.ejemplar?.libro?.titulo || "Libro"} />
+              <BotonDevolver prestamoId={prestamo.id} tituloLibro={prestamo.ejemplar?.libro?.titulo  || "Libro"} />
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          {/* Tarjeta del Lector */}
+          {/* Tarjeta del Lector
           <div className={`p-6 rounded-xl shadow-sm border border-t-4 transition-colors ${config?.temaId === 'obsidian' ? 'bg-[var(--card-bg)] border-white/10 border-t-green-500' : 'bg-white border-gray-200 border-t-green-500'}`}>
             <h2 className={`text-xl font-bold mb-4 border-b pb-2 ${config?.temaId === 'obsidian' ? 'text-white border-white/10' : 'text-gray-800 border-gray-100'}`}>Datos del Lector</h2>
             <div className="space-y-3">
@@ -107,6 +107,65 @@ export default async function DetallePrestamo({ params }: { params: Promise<{ id
                 <span className={`text-sm block uppercase tracking-wide font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Curso o Aula</span>
                 <span className={`font-semibold text-lg ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-900'}`}>{prestamo.cursoOAula}</span>
               </p>
+            </div>
+          </div> */}
+          {/* Tarjeta del Lector */}
+          <div className={`p-6 rounded-xl shadow-sm border border-t-4 transition-colors ${config?.temaId === 'obsidian' ? 'bg-[var(--card-bg)] border-white/10 border-t-green-500' : 'bg-white border-gray-200 border-t-green-500'}`}>
+            
+            <div className="flex justify-between items-start mb-6 border-b pb-4 border-gray-100">
+              <h2 className={`text-xl font-bold ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-800'}`}>Datos del Lector</h2>
+              {/* Etiqueta Visual de Tipo de Préstamo */}
+              {prestamo.usuario ? (
+                 <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                   ✅ Usuario Registrado
+                 </span>
+              ) : (
+                 <span className="bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                   ⚠️ Temporal (Carga Rápida)
+                 </span>
+              )}
+            </div>
+
+            <div className="space-y-5">
+              <p>
+                <span className={`text-xs block uppercase tracking-wider font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Nombre Completo</span>
+                <span className={`font-semibold text-xl ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-900'}`}>
+                  {prestamo.usuario ? `${prestamo.usuario.nombre} ${prestamo.usuario.apellido}` : prestamo.nombreLector}
+                </span>
+              </p>
+
+              {/* Fila a dos columnas para aprovechar el espacio */}
+              <div className="grid grid-cols-2 gap-4">
+                <p>
+                  <span className={`text-xs block uppercase tracking-wider font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Curso / Perfil</span>
+                  <span className={`font-semibold text-lg ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-900'}`}>
+                    {prestamo.usuario 
+                      ? (prestamo.usuario.rol === 0 ? (prestamo.usuario.grupo?.nombre || 'Alumno') : 'Docente / Admin')
+                      : (prestamo.cursoOAula|| '-')}
+                  </span>
+                </p>
+
+                {/* Si es oficial mostramos DNI, si es manual mostramos el teléfono rápido */}
+                {prestamo.usuario ? (
+                  <p>
+                    <span className={`text-xs block uppercase tracking-wider font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>DNI</span>
+                    <span className={`font-semibold text-lg ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-900'}`}>{prestamo.usuario.dni}</span>
+                  </p>
+                ) : (
+                  <p>
+                    <span className={`text-xs block uppercase tracking-wider font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Teléfono de Contacto</span>
+                    <span className={`font-semibold text-lg ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-900'}`}>{prestamo.telefonoManual || 'No registrado'}</span>
+                  </p>
+                )}
+              </div>
+              
+              {/* Si es un usuario oficial y además tiene teléfono cargado en su perfil, lo sumamos */}
+              {prestamo.usuario && prestamo.usuario.telefono && (
+                <p>
+                    <span className={`text-xs block uppercase tracking-wider font-bold mb-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>Teléfono de Contacto</span>
+                    <span className={`font-semibold text-lg ${config?.temaId === 'obsidian' ? 'text-white' : 'text-gray-900'}`}>{prestamo.usuario.telefono}</span>
+                </p>
+              )}
             </div>
           </div>
 

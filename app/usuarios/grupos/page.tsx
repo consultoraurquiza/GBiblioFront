@@ -11,7 +11,7 @@ export default function GruposPage() {
   // Estados del Modal
   const [modalAbierto, setModalAbierto] = useState(false);
   const [grupoEditando, setGrupoEditando] = useState<any>(null);
-  const [formData, setFormData] = useState({ nombre: "", turno: "Mañana" });
+  const [formData, setFormData] = useState({ nombre: "", turno: "Mañana", habilitado: true });
   const [cargandoGuardar, setCargandoGuardar] = useState(false);
   const [errorValidacion, setErrorValidacion] = useState("");
 
@@ -73,14 +73,14 @@ export default function GruposPage() {
 
   const abrirModalNuevo = () => {
     setGrupoEditando(null);
-    setFormData({ nombre: "", turno: "Mañana" });
+    setFormData({ nombre: "", turno: "Mañana", habilitado: true });
     setErrorValidacion("");
     setModalAbierto(true);
   };
 
   const abrirModalEditar = (grupo: any) => {
     setGrupoEditando(grupo);
-    setFormData({ nombre: grupo.nombre, turno: grupo.turno });
+    setFormData({ nombre: grupo.nombre, turno: grupo.turno, habilitado: grupo.habilitadoParaPrestamos  });
     setErrorValidacion("");
     setModalAbierto(true);
   };
@@ -126,6 +126,7 @@ export default function GruposPage() {
                 <th className="p-4 font-bold text-sm">Nombre del Grupo</th>
                 <th className="p-4 font-bold text-sm">Turno</th>
                 <th className="p-4 font-bold text-sm text-center">Cant. Alumnos</th>
+                <th className="p-4 font-bold text-sm text-center">Habilitado Préstamos</th>
                 <th className="p-4 font-bold text-sm text-center">Acciones</th>
               </tr>
             </thead>
@@ -144,6 +145,7 @@ export default function GruposPage() {
                       </span>
                     </td>
                     <td className="p-4 text-center font-medium">{g.cantidadAlumnos || 0}</td>
+                    <td className="p-4 font-bold text-lg">{g.habilitadoParaPrestamos ? '✅' : '❌'}</td>
                     <td className="p-4 text-center">
                       <button onClick={() => abrirModalEditar(g)} className="bg-[var(--acento)] hover:brightness-110 px-4 py-2 rounded-lg text-sm font-bold text-white transition shadow-sm">
                         ✏️ Editar
@@ -179,6 +181,20 @@ export default function GruposPage() {
                   <option value="Tarde">🌤️ Tarde</option>
                   <option value="Vespertino">🌙 Vespertino</option>
                 </select>
+              </div>
+              <div className={`mt-4 p-4 rounded-xl border flex items-center justify-between transition-colors ${formData.habilitado ? (config?.temaId === 'obsidian' ? 'bg-green-900/20 border-green-500/30' : 'bg-green-50 border-green-200') : (config?.temaId === 'obsidian' ? 'bg-red-900/20 border-red-500/30' : 'bg-red-50 border-red-200')}`}>
+                <div>
+                  <p className={`font-bold text-sm ${formData.habilitado ? 'text-green-600' : 'text-red-600'}`}>
+                    {formData.habilitado ? '✅ Habilitado para Préstamos' : '🚫 Suspendido / Inhabilitado'}
+                  </p>
+                  <p className={`text-xs mt-1 ${config?.temaId === 'obsidian' ? 'text-slate-400' : 'text-gray-500'}`}>
+                    {formData.habilitado ? 'El grupo puede retirar libros.' : 'El grupo no puede retirar libros.'}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={formData.habilitado} onChange={(e) => setFormData({ ...formData, habilitado: e.target.checked })} />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
               </div>
             </div>
             <div className={`p-4 flex justify-end gap-3 border-t ${config?.temaId === 'obsidian' ? 'bg-slate-800/50 border-slate-800' : 'bg-gray-50 border-gray-100'}`}>

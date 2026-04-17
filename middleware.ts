@@ -29,6 +29,8 @@ export const config = {
     '/admin/:path*',
     '/prestar/:path*',
     '/componentes/:path*',
+    '/tutorial/:path*',
+    '/about/:path*',
     // Agregá acá cualquier otra ruta que quieras proteger
   ],
 };
